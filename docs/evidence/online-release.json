@@ -1,0 +1,67 @@
+{
+  "recorded_at": "2026-10-28",
+  "source": "live browser submission to deployed product",
+  "product_url": "http://47.76.25.13/shuce/",
+  "task_id": "a5e41f963b84",
+  "status": "completed",
+  "duration_ms": 30830,
+  "model_requests": 6,
+  "capabilities": {
+    "chat": 4,
+    "embedding": 1,
+    "rerank": 1
+  },
+  "model_failures": 0,
+  "network_retries": 0,
+  "tool_calls": [
+    {
+      "name": "query_olist_ecommerce",
+      "operation": "call",
+      "success": true,
+      "duration_ms": 11387
+    }
+  ],
+  "rows": [
+    {
+      "customer_city": "rio de janeiro",
+      "order_count": 44,
+      "item_sales": 9234.59,
+      "item_sales_per_order": 209.88
+    },
+    {
+      "customer_city": "sao goncalo",
+      "order_count": 2,
+      "item_sales": 1013,
+      "item_sales_per_order": 506.5
+    },
+    {
+      "customer_city": "sao joao de meriti",
+      "order_count": 1,
+      "item_sales": 527.9,
+      "item_sales_per_order": 527.9
+    },
+    {
+      "customer_city": "macae",
+      "order_count": 2,
+      "item_sales": 485,
+      "item_sales_per_order": 242.5
+    },
+    {
+      "customer_city": "teresopolis",
+      "order_count": 2,
+      "item_sales": 348.08,
+      "item_sales_per_order": 174.04
+    }
+  ],
+  "compared_to": "city-query.csv (numeric values compared, compatible alias for per-order amount)",
+  "initial_failed_attempt": {
+    "status": "failed",
+    "reason": "DuckDB memory limit exceeded during CSV query",
+    "model_requests": 8,
+    "tool_calls": 3
+  },
+  "limitations": [
+    "Single execution timing, not average performance",
+    "Simulated business task on public historical data, not external user research"
+  ]
+}

@@ -89,9 +89,11 @@ class DuckDbEngine:
         connection = duckdb.connect(":memory:")
         try:
             import os
-            if os.getenv('SHUCE_PUBLIC_DEPLOYMENT', '').lower() in {'1','true','yes'}:
+            public = os.getenv('SHUCE_PUBLIC_DEPLOYMENT', '').lower() in {'1','true','yes'}
+            if public:
                 connection.execute("SET memory_limit='256MB'")
-                connection.execute("SET threads=2")
+                connection.execute("SET threads=1")
+                connection.execute("SET preserve_insertion_order=false")
             csv_files = sorted(folder.glob("*.csv"))
             if not csv_files:
                 raise ValueError(f"数据库文件夹没有CSV表：{folder}")
@@ -100,12 +102,12 @@ class DuckDbEngine:
                 if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table):
                     raise ValueError(f"CSV文件名不能作为安全表名：{csv_path.name}")
                 path = csv_path.resolve().as_posix().replace("'", "''")
-                options = ""
+                options = ", buffer_size=4194304, parallel=false" if public else ""
                 if database.startswith("local_"):
                     metadata = json.loads((folder / "_schema.json").read_text())
                     definition = next(t for t in metadata["tables"] if t["name"] == table)
                     types = {f["name"]: f.get("source_type", "VARCHAR") for f in definition["fields"]}
-                    options = ", types=" + str(types)
+                    options += ", types=" + str(types)
                 connection.execute(
                     f'CREATE VIEW "{table}" AS '
                     f"SELECT * FROM read_csv_auto('{path}', header=true, sample_size=-1{options})"

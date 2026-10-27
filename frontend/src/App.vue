@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createConversationId } from "./conversationId"
 import AnalysisScope from "./components/AnalysisScope.vue"
 import ExecutionDetails from './components/ExecutionDetails.vue'
 import AgentCallProgress from './components/AgentCallProgress.vue'
@@ -342,7 +343,7 @@ function createConversation() {
     return
   }
   const item: ConversationRecord = {
-    id: crypto.randomUUID(),
+    id: createConversationId(),
     title: "新对话",
     updatedAt: Date.now(),
     turns: [],

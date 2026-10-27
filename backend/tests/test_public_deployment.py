@@ -54,3 +54,15 @@ class PublicDeploymentTests(unittest.TestCase):
                     result=client.post('/api/jobs',headers={'Authorization':'Bearer '+token},json={'query':'查订单','session_id':'new','workspace':{'database_id':'olist_ecommerce'}})
                     self.assertEqual(result.status_code,429)
                     executor.submit.assert_not_called()
+
+    def test_scoped_city_query_fits_public_memory_limit_and_preserves_results(self):
+        from pathlib import Path
+        from app.querying.duckdb_engine import DuckDbEngine
+        sql=(Path(__file__).resolve().parents[2]/'docs/evidence/city-query.sql').read_text()
+        with patch.dict(os.environ, {'SHUCE_PUBLIC_DEPLOYMENT':'true'}):
+            result=DuckDbEngine().execute('olist_ecommerce',sql,AccessController().resolve('demo_olist_analyst'))
+        self.assertTrue(result.success,result.error)
+        self.assertEqual(result.total_rows,5)
+        self.assertEqual(result.rows[0]['customer_city'],'rio de janeiro')
+        self.assertEqual(result.rows[0]['order_count'],44)
+        self.assertEqual(result.rows[0]['item_sales'],9234.59)
