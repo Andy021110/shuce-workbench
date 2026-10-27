@@ -1,0 +1,420 @@
+{
+  "repo": "https://github.com/Andy021110/shuce-workbench",
+  "lanes": [
+    "工作台与访问边界",
+    "任务分流与检索",
+    "查询与执行",
+    "结果与交付"
+  ],
+  "nodes": [
+    {
+      "id": "ui",
+      "lane": 0,
+      "title": "Vue 工作台",
+      "subtitle": "问题 / 范围 / 分析记录",
+      "description": "承接自然语言问题、固定经营任务、已有分析和报告；保留草稿与恢复入口。",
+      "input": "业务问题、当前数据源与分析范围。",
+      "output": "带会话标识和范围的业务请求。",
+      "boundary": "当前在线入口需要受限体验账号；只读业务回放不会调用模型。",
+      "files": [
+        "frontend/src/App.vue"
+      ]
+    },
+    {
+      "id": "api",
+      "lane": 0,
+      "title": "FastAPI 服务",
+      "subtitle": "认证 / 任务 / 历史",
+      "description": "提供异步任务、分析结果、历史与导出接口，统一组织业务服务。",
+      "input": "已认证的业务请求。",
+      "output": "任务状态、结果快照和业务状态。",
+      "boundary": "HTTP 成功不等于报告校验通过；停止页面等待不保证供应商请求已取消。",
+      "files": [
+        "backend/app/service.py",
+        "backend/app/services/askdata_service.py"
+      ]
+    },
+    {
+      "id": "scope",
+      "lane": 0,
+      "title": "AccessScope",
+      "subtitle": "用户 / 来源 / 表范围",
+      "description": "在后端限制允许的数据源、表和工具，而不仅仅隐藏前端按钮。",
+      "input": "已认证身份、当前数据源与操作。",
+      "output": "允许访问的表与操作范围。",
+      "boundary": "线上 analyst 仅访问 Olist 9 表，禁止导入及重建；演示认证不能替代企业身份。",
+      "files": [
+        "backend/app/security/auth.py",
+        "backend/app/analysis_scope.py"
+      ]
+    },
+    {
+      "id": "router",
+      "lane": 1,
+      "title": "LangGraph 分流",
+      "subtitle": "理解意图 / 规划步骤",
+      "description": "QueryWorkflow 组织自由问数的预处理、任务类型判断、澄清和执行。",
+      "input": "自然语言问题与已有会话背景。",
+      "output": "查询所需的范围、意图及后续节点。",
+      "boundary": "含糊条件应澄清，不应默默丢弃复杂排除条件。",
+      "files": [
+        "backend/app/workflows/query_graph.py",
+        "backend/app/workflows/state.py"
+      ]
+    },
+    {
+      "id": "standard",
+      "lane": 1,
+      "title": "固定口径任务",
+      "subtitle": "指标注册 / 月度复盘",
+      "description": "按定义好的指标、月份和范围生成标准 SQL，支持稳定核对的经营复盘。",
+      "input": "已确认月份、品类、地区与指标。",
+      "output": "经过结构化范围检查的标准 SQL。",
+      "boundary": "固定查询可以不调用模型、Embedding、Rerank 或 MCP；后续生成报告是另一项处理。",
+      "files": [
+        "backend/app/metric_registry.py",
+        "backend/app/monthly_review.py"
+      ]
+    },
+    {
+      "id": "retrieve",
+      "lane": 1,
+      "title": "Schema 检索",
+      "subtitle": "BM25 / 向量 / 重排",
+      "description": "把问题和可见数据结构关联，组合 BM25、Embedding、RRF 与 Rerank 选择相关表和字段。",
+      "input": "问题、Schema 索引与允许的数据范围。",
+      "output": "供查询规划使用的相关结构。",
+      "boundary": "召回结构不代表已经查出业务数字；Embedding 与 Rerank 单独计数。",
+      "files": [
+        "backend/app/retrieval/service.py",
+        "backend/app/retrieval/graph.py"
+      ]
+    },
+    {
+      "id": "clarify",
+      "lane": 1,
+      "title": "范围澄清",
+      "subtitle": "补条件 / 等待确认",
+      "description": "关键范围不足或条件存在歧义时，要求用户补充后再继续。",
+      "input": "含糊的时间、指标、地区或排除条件。",
+      "output": "需要用户确认的问题及保留的上下文。",
+      "boundary": "等待补充不是查询已完成；本场景不伪造 SQL 结果。",
+      "files": [
+        "backend/app/workflows/query_graph.py",
+        "backend/app/scope_language.py"
+      ]
+    },
+    {
+      "id": "mcp",
+      "lane": 2,
+      "title": "本地 MCP 工具",
+      "subtitle": "限定权限的 SQL 工具",
+      "description": "单数据库 Agent 通过进程内 MCP 调用允许的数据库工具执行受限查询。",
+      "input": "查询意图、Schema、允许的工具与表。",
+      "output": "SQL 工具调用与数据库结果。",
+      "boundary": "这是本地进程内 MCP；工具发现不计作实际数据库执行。",
+      "files": [
+        "backend/app/mcp_runtime/client.py",
+        "backend/app/mcp_runtime/server.py",
+        "backend/app/mcp_runtime/tools/database_tools.py"
+      ]
+    },
+    {
+      "id": "sql",
+      "lane": 2,
+      "title": "SQL 与 DuckDB",
+      "subtitle": "只读查询 / CSV 数据",
+      "description": "按权限检查查询并执行本地 CSV 上的 SQL，返回可核对的行列。",
+      "input": "受限 SQL 和允许的数据表。",
+      "output": "查询结果、字段与执行错误。",
+      "boundary": "城市验收曾因 CSV 缓冲内存失败；模型请求成功不等于工具成功。",
+      "files": [
+        "backend/app/mcp_runtime/tools/database_tools.py",
+        "backend/app/service.py"
+      ]
+    },
+    {
+      "id": "telemetry",
+      "lane": 2,
+      "title": "实际调用记录",
+      "subtitle": "模型 / 工具 / Token",
+      "description": "在真实请求边界记录 Chat、Embedding、Rerank 和工具成功或失败，供界面展示。",
+      "input": "实际开始、完成、失败与供应商用量。",
+      "output": "安全调用摘要和可观察的执行状态。",
+      "boundary": "不记录密钥或隐式推理；没有供应商实时账单，缺失用量不是零。",
+      "files": [
+        "backend/app/telemetry.py"
+      ]
+    },
+    {
+      "id": "snapshot",
+      "lane": 3,
+      "title": "结果快照",
+      "subtitle": "完整行集 / 分页 / 导出",
+      "description": "保留 SQL、范围、完整结果和调用摘要，支持核查、筛选、分页与 CSV 导出。",
+      "input": "已经执行的结果、SQL 与元数据。",
+      "output": "可恢复的分析结果及导出材料。",
+      "boundary": "不能用当前页展示的几行充当完整结果；必须保留对应快照文件。",
+      "files": [
+        "backend/app/workflows/result_builder.py",
+        "backend/app/services/askdata_service.py"
+      ]
+    },
+    {
+      "id": "report",
+      "lane": 3,
+      "title": "报告事实校验",
+      "subtitle": "引用 / 数字 / 人工补充",
+      "description": "从已执行结果建立事实，再核对报告数字与范围；失败时保留事实并说明未完成。",
+      "input": "允许使用的已完成分析和报告内容。",
+      "output": "校验后的交付，或明确的事实回退。",
+      "boundary": "自动报告仍存在历史反例；传输完成不代表报告交付成功。",
+      "files": [
+        "backend/app/report_facts.py",
+        "backend/app/services/askdata_service.py"
+      ]
+    },
+    {
+      "id": "archive",
+      "lane": 3,
+      "title": "历史与恢复",
+      "subtitle": "SQLite / 草稿 / 会话",
+      "description": "按用户与来源归档分析记录，配合浏览器草稿支持再次返回继续处理。",
+      "input": "会话、任务摘要与对应结果文件。",
+      "output": "命名分析、恢复历史与可继续的任务。",
+      "boundary": "浏览器草稿不是跨设备同步；服务重启不保证恢复任意执行中间点。",
+      "files": [
+        "backend/app/services/session_archive.py",
+        "backend/app/services/session_context.py"
+      ]
+    }
+  ],
+  "edges": [
+    [
+      "ui",
+      "api"
+    ],
+    [
+      "api",
+      "scope"
+    ],
+    [
+      "scope",
+      "router"
+    ],
+    [
+      "scope",
+      "standard"
+    ],
+    [
+      "router",
+      "retrieve"
+    ],
+    [
+      "retrieve",
+      "clarify"
+    ],
+    [
+      "retrieve",
+      "mcp"
+    ],
+    [
+      "mcp",
+      "sql"
+    ],
+    [
+      "standard",
+      "sql"
+    ],
+    [
+      "sql",
+      "snapshot"
+    ],
+    [
+      "sql",
+      "telemetry"
+    ],
+    [
+      "telemetry",
+      "snapshot"
+    ],
+    [
+      "snapshot",
+      "report"
+    ],
+    [
+      "snapshot",
+      "archive"
+    ],
+    [
+      "report",
+      "archive"
+    ]
+  ],
+  "scenarios": [
+    {
+      "id": "city-agent",
+      "title": "自由问数：RJ 城市经营分析",
+      "kind": "线上真实任务的架构回看",
+      "question": "2018 年 8 月，RJ 州、健康美容、已送达订单，按城市统计订单数与商品金额，取前五。",
+      "evidence": "2026.10.28：Chat 4、Embedding 1、Rerank 1，数据库工具 1 次；5 行已独立核对。",
+      "evidenceUrl": "https://github.com/Andy021110/shuce-workbench/blob/main/docs/evidence/online-release.json",
+      "steps": [
+        {
+          "node": "ui",
+          "note": "从网页提交问题；这里回看已完成任务，不重新调用模型。"
+        },
+        {
+          "node": "api",
+          "note": "创建业务任务并提供可查询的运行状态。"
+        },
+        {
+          "node": "scope",
+          "note": "把可访问范围限定到体验账号允许的 Olist 表。"
+        },
+        {
+          "node": "router",
+          "note": "理解时间、州、品类、状态与城市聚合意图。"
+        },
+        {
+          "node": "retrieve",
+          "note": "检索相关表结构，实际样本包含一次 Embedding 与一次 Rerank 请求。"
+        },
+        {
+          "node": "mcp",
+          "note": "Agent 通过允许的数据库工具提交查询。"
+        },
+        {
+          "node": "sql",
+          "note": "在 DuckDB 上执行受限 SQL；本次工具执行成功。"
+        },
+        {
+          "node": "telemetry",
+          "note": "实际请求边界留下 4 次 Chat、1 次 Embedding、1 次 Rerank 和 1 次工具执行的记录。"
+        },
+        {
+          "node": "snapshot",
+          "note": "保留完整 5 行、SQL 和调用明细；里约 44 单、商品金额 R$9,234.59。"
+        },
+        {
+          "node": "archive",
+          "note": "命名、导出并刷新恢复分析；本次线上验收均通过。"
+        }
+      ]
+    },
+    {
+      "id": "standard-review",
+      "title": "固定复盘：直接执行标准 SQL",
+      "kind": "确定性业务路径",
+      "question": "选择月份和业务范围，使用已有指标口径比较经营变化。",
+      "evidence": "固定查询路径可以没有模型调用；后续报告生成单独计入。",
+      "evidenceUrl": "https://github.com/Andy021110/shuce-workbench/blob/main/docs/architecture.md",
+      "steps": [
+        {
+          "node": "ui",
+          "note": "选择固定经营任务和结构化分析范围。"
+        },
+        {
+          "node": "api",
+          "note": "提交固定任务请求。"
+        },
+        {
+          "node": "scope",
+          "note": "核对用户可访问的数据源与表。"
+        },
+        {
+          "node": "standard",
+          "note": "从指标注册和复盘逻辑生成标准 SQL。"
+        },
+        {
+          "node": "sql",
+          "note": "直接执行受限 SQL，不经过自由问数 Agent 或 MCP。"
+        },
+        {
+          "node": "snapshot",
+          "note": "返回可以分页、核对和导出的结果快照。"
+        },
+        {
+          "node": "archive",
+          "note": "保留本次分析及来源，后续可以继续处理。"
+        }
+      ]
+    },
+    {
+      "id": "ambiguous",
+      "title": "条件不明确：先澄清再执行",
+      "kind": "异常与等待分支",
+      "question": "“看最近表现，但排除不合适的城市。”时间与排除条件还不明确。",
+      "evidence": "按工作流与复杂业务回归解释此分支，不声称这段示例是新增实跑。",
+      "evidenceUrl": "https://github.com/Andy021110/shuce-workbench/blob/main/backend/tests/test_complex_business.py",
+      "steps": [
+        {
+          "node": "ui",
+          "note": "保留业务人员提出的原始条件。"
+        },
+        {
+          "node": "api",
+          "note": "请求进入自由问数流程。"
+        },
+        {
+          "node": "scope",
+          "note": "先确定当前可访问的数据源范围。"
+        },
+        {
+          "node": "router",
+          "note": "识别关键条件不明确，不能直接丢弃排除条件。"
+        },
+        {
+          "node": "retrieve",
+          "note": "必要时检索相关数据结构以组织澄清问题。"
+        },
+        {
+          "node": "clarify",
+          "note": "要求补充时间与明确的排除规则，暂不进入 SQL 执行。"
+        }
+      ]
+    },
+    {
+      "id": "report-fallback",
+      "title": "报告校验失败：保留已执行事实",
+      "kind": "已知业务反例的处理边界",
+      "question": "查询已完成，但生成的经营报告含有不能通过数字或范围校验的内容。",
+      "evidence": "历史区域月会试用有两次自动报告校验回退；这些问题继续保留在台账中。",
+      "evidenceUrl": "https://github.com/Andy021110/shuce-workbench/blob/main/docs/product/05-体验问题台账.md",
+      "steps": [
+        {
+          "node": "ui",
+          "note": "从已有结果准备经营报告。"
+        },
+        {
+          "node": "api",
+          "note": "读取当前用户和来源允许的分析结果。"
+        },
+        {
+          "node": "scope",
+          "note": "不能把客户端任意提交的行数据当作可信历史来源。"
+        },
+        {
+          "node": "standard",
+          "note": "这里以固定复盘产生的事实作为报告依据。"
+        },
+        {
+          "node": "sql",
+          "note": "保留已经执行且可核查的 SQL 结果。"
+        },
+        {
+          "node": "snapshot",
+          "note": "结果事实仍可用，不因报告失败而丢弃。"
+        },
+        {
+          "node": "report",
+          "note": "数字或范围校验失败，明确报告未完成，进入事实回退或人工补充。"
+        },
+        {
+          "node": "archive",
+          "note": "分别保留分析事实、报告状态和人工编辑记录。"
+        }
+      ]
+    }
+  ]
+}

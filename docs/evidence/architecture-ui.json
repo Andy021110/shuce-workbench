@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-28",
+  "page": "http://47.76.25.13/portfolio/shuce.html#interactive-architecture",
+  "scope": "只读作品集交互，不修改在线产品逻辑，不发起模型请求",
+  "local_and_live_checked": true,
+  "scenarios": [
+    {
+      "product": "shuce",
+      "scenario": "city-agent",
+      "steps": 10,
+      "all_steps_checked": true,
+      "inactive_module_checked": true
+    },
+    {
+      "product": "shuce",
+      "scenario": "standard-review",
+      "steps": 7,
+      "all_steps_checked": true,
+      "inactive_module_checked": true
+    },
+    {
+      "product": "shuce",
+      "scenario": "ambiguous",
+      "steps": 6,
+      "all_steps_checked": true,
+      "inactive_module_checked": true
+    },
+    {
+      "product": "shuce",
+      "scenario": "report-fallback",
+      "steps": 8,
+      "all_steps_checked": true,
+      "inactive_module_checked": true
+    }
+  ],
+  "responsive": [
+    {
+      "product": "shuce",
+      "width": 768,
+      "page_overflow": false,
+      "node_targets_44px": true
+    },
+    {
+      "product": "shuce",
+      "width": 375,
+      "page_overflow": false,
+      "node_targets_44px": true
+    },
+    {
+      "product": "shuce",
+      "width": 320,
+      "page_overflow": false,
+      "node_targets_44px": true
+    }
+  ],
+  "desktop_width": 1440,
+  "checks": [
+    "4 个场景全部步骤与当前模块同步",
+    "未展开模块的职责与源码链接",
+    "播放、暂停、上一步与下一步",
+    "键盘 Enter 选择模块",
+    "手机点选详情及返回焦点",
+    "浅色、深色与减少动态",
+    "无 JavaScript 时保留静态架构链接"
+  ],
+  "js_errors": [],
+  "no_product_api_requests": true
+}

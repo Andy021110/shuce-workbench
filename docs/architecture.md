@@ -1,5 +1,7 @@
 # 架构与实现
 
+[可交互架构图：切换场景、点选模块并查看对应实现](http://47.76.25.13/portfolio/shuce.html#interactive-architecture)
+
 ## 模块和数据流
 
 前端使用 Vue 3、TypeScript 与 Vite。`App.vue` 负责登录、数据源和分析会话；独立组件承接经营首页、范围、结果、图表、报告、CSV 管理和实际调用记录。

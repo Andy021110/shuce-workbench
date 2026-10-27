@@ -6,7 +6,7 @@
 
 数策面向需要查数、准备例会和定位经营异常的业务人员，把自然语言问数、固定口径复盘、结果核对与报告交付放进同一条工作流。
 
-[在线产品 · 需体验账号](http://47.76.25.13/shuce/) · [产品案例与业务回放](http://47.76.25.13/portfolio/shuce.html) · [只读业务回放](http://47.76.25.13/portfolio/shuce.html#business-replay) · [用户任务地图](docs/用户任务地图.md) · [架构与实现](docs/architecture.md) · [验证与已知限制](docs/validation.md) · [本地启动](#本地启动)
+[在线产品 · 需体验账号](http://47.76.25.13/shuce/) · [产品案例与业务回放](http://47.76.25.13/portfolio/shuce.html) · [只读业务回放](http://47.76.25.13/portfolio/shuce.html#business-replay) · [用户任务地图](docs/用户任务地图.md) · [架构与实现](docs/architecture.md) · [可交互架构图](http://47.76.25.13/portfolio/shuce.html#interactive-architecture) · [验证与已知限制](docs/validation.md) · [本地启动](#本地启动)
 
 ![数策真实工作台：城市经营分析与实际 Agent 调用记录](docs/images/workbench-desktop.jpg)
 
@@ -221,3 +221,7 @@ portfolio/          数策案例页与只读回放素材
 ```
 
 数据来源与代码包来源见[来源说明](docs/data-and-provenance.md)及[来源摘要](docs/source-provenance.json)。Olist 原始数据不随仓库重新分发。原代码包未附独立 LICENSE 文件，本次未为原有代码新增开源许可证；仓库公开展示不应被表述为已确认第三方底座的开源授权。
+
+### 可交互架构导览
+
+[打开作品集交互架构图](http://47.76.25.13/portfolio/shuce.html#interactive-architecture)：支持 4 个业务场景切换、模块输入输出与源码查看、逐步讲解和自动播放。图为只读架构说明，不发起模型请求；历史实跑与异常分支分别标注依据，不能将路径播放当作新的调用记录。网页源码位于 `portfolio/assets/architecture/`。
