@@ -23,9 +23,10 @@ class AnalysisTableInput(BaseModel):
 class WorkspaceConfig(BaseModel):
     database_id: str | None = None
     schema_fields: list[ConfirmedField] = Field(default_factory=list)
-    analysis_table_ids: list[str] = Field(default_factory=list)
+    analysis_table_ids: list[str] = Field(default_factory=list, max_length=12)
     analysis_tables: list[AnalysisTableInput] = Field(default_factory=list)
     continuation_task_id: str | None = Field(default=None,max_length=64)
+    retry_task_id: str | None = Field(default=None,max_length=64)
     # 兼容旧版前端的 fields 属性。
     fields: list[ConfirmedField] = Field(default_factory=list)
 
@@ -128,6 +129,8 @@ class AnalysisReport(BaseModel):
     fact_references: list[dict[str, Any]] = Field(default_factory=list)
     generation_mode: Literal["model_with_facts", "facts_only", "backend_facts"] = "model_with_facts"
     validation_feedback: list[str] = Field(default_factory=list)
+    evidence_markdown: str = ""
+    validation_codes: list[str] = Field(default_factory=list)
 
 
 class QueryResult(BaseModel):
@@ -163,6 +166,7 @@ class QueryResult(BaseModel):
     tool_calls: list[dict[str, Any]] = Field(default_factory=list)
     result_title: str | None = None
     analysis_sources: list[dict[str, Any]] = Field(default_factory=list)
+    answer_checks: list[dict[str, str]] = Field(default_factory=list)
     standalone_query: str | None = None
     schema_graph: dict[str, Any] | None = None
     workflow_mode: str | None = None

@@ -4,6 +4,7 @@ import type { AnalysisReport, ReportDataSource, ReportEdit } from "../types"
 import AnalysisChart from "./AnalysisChart.vue"
 import ReportEditor from "./ReportEditor.vue"
 import MarkdownReport from "./MarkdownReport.vue"
+import { reportSections, reportMarkdown } from "../reportPresentation"
 
 const props = defineProps<{
   report: AnalysisReport
@@ -23,7 +24,7 @@ const manualMarkdown=computed(()=>{
 const reportElement = ref<HTMLElement | null>(null)
 
 const displayMarkdown = computed(() => {
-  const lines = props.report.markdown.replace(/\r\n/g, "\n").split("\n")
+  const lines = reportSections(props.report).summary.replace(/\r\n/g, "\n").split("\n")
   const firstContent = lines.findIndex((line) => line.trim())
   if (firstContent >= 0) {
     const heading = lines[firstContent].trim().match(/^#\s+(.+)$/)
@@ -34,23 +35,24 @@ const displayMarkdown = computed(() => {
   return lines.join("\n").trim()
 })
 
-function exportMarkdown() {
-  const evidence=(props.report.fact_references || []).map(f=>`- ${f.label}：${f.display}；来源：${f.source_title}；范围：${f.scope}`).join('\n')
-  const blob = new Blob(['# '+title.value+'\n\n'+displayMarkdown.value + (manualMarkdown.value?'\n\n'+manualMarkdown.value:'') + (evidence ? '\n\n## 数值引用依据\n\n' + evidence : '')], { type: "text/markdown;charset=utf-8" })
+const evidenceMarkdown=computed(()=>reportSections(props.report).evidence)
+function exportMarkdown(summaryOnly=false) {
+  const blob = new Blob([reportMarkdown(props.report,title.value,manualMarkdown.value,summaryOnly)], { type: "text/markdown;charset=utf-8" })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement("a")
   anchor.href = url
-  anchor.download = `${title.value.replace(/[\\/:*?\"<>|]/g, "-") || "数据分析报告"}.md`
+  anchor.download = `${title.value.replace(/[\\/:*?\"<>|]/g, "-") || "数据分析报告"}${summaryOnly ? "-摘要" : ""}.md`
   anchor.click()
   URL.revokeObjectURL(url)
 }
 
-function exportPdf() {
+function exportPdf(summaryOnly=true) {
   if (!reportElement.value) return
 
   const printable = reportElement.value.cloneNode(true) as HTMLElement
   printable.classList.add("pdf-print-root")
   printable.querySelectorAll(".report-actions,.report-edit-controls").forEach((element) => element.remove())
+  if(summaryOnly)printable.querySelectorAll(".report-appendix,.report-evidence").forEach(element=>element.remove())
   printable.querySelectorAll("details").forEach(element=>element.open=true)
 
   const previousTitle = document.title
@@ -84,8 +86,9 @@ function exportPdf() {
     <header class="report-header">
       <div><small>{{ report.generation_mode==='backend_facts' ? '后端事实报告 · 可人工补充' : report.generation_mode==='facts_only' ? '后端事实报告 · 模型解读尚未通过校验' : report.fact_references?.length ? '后端数值事实 · 模型经营解读' : '模型分析 · 需结合数据核对' }}</small><h2>{{ title }}</h2></div>
       <div class="report-actions">
-        <button @click="exportMarkdown"><span>↓</span> 导出 .md</button>
-        <button class="pdf-export" title="打开系统打印窗口并保存为PDF" @click="exportPdf"><span>▣</span> 导出 PDF</button>
+        <button @click="exportMarkdown(false)"><span>↓</span> 导出 .md</button>
+        <button @click="exportMarkdown(true)">仅导出摘要</button>
+        <button class="pdf-export" title="只打印摘要、图表和已保存人工补充" @click="exportPdf(true)">摘要 PDF</button><button class="pdf-export" title="含查询事实与数值依据" @click="exportPdf(false)">完整 PDF</button>
       </div>
     </header>
     <div v-if="report.visualizations.length" class="report-charts">
@@ -94,7 +97,9 @@ function exportPdf() {
     <div v-if="report.validation_feedback?.length" class="report-feedback" role="status"><strong>解读校验反馈</strong><p v-for="message in report.validation_feedback" :key="message">{{ message }}</p></div>
     <ReportEditor :draft-owner="draftOwner" :task-id="taskId" :original-title="report.title" :edit="edit" @saved="emit('edited',$event)" />
     <section v-if="edit" class="manual-notes" aria-label="人工补充内容"><h3>人工补充</h3><p>作者：{{ edit.editor_label }} · {{ new Date(edit.updated_at).toLocaleString('zh-CN') }} · 未做自动事实校验</p><template v-for="item in [{label:'人工结论',text:edit.conclusion},{label:'待验证原因',text:edit.hypotheses},{label:'下一步动作',text:edit.actions}]" :key="item.label"><div v-if="item.text"><h4>{{ item.label }}</h4><p class="manual-content">{{ item.text }}</p></div></template></section>
-    <details class="original-report" :open="!edit"><summary>原始报告与查询事实 · 保留原文</summary><MarkdownReport :markdown="displayMarkdown" /></details>
+    <section v-if="!edit" aria-label="报告摘要"><MarkdownReport v-if="displayMarkdown" :markdown="displayMarkdown" /><p v-else class="report-brief-note">查询事实已整理，展开依据附录核对；可人工补充结论。</p></section>
+    <details v-else class="original-report"><summary>原始模型解读 · 保留原文</summary><MarkdownReport :markdown="displayMarkdown" /></details>
+    <details v-if="evidenceMarkdown" class="original-report report-appendix"><summary>展开查询事实附录 · 逐份核对来源</summary><MarkdownReport :markdown="evidenceMarkdown" /></details>
     <details v-if="report.fact_references?.length" class="report-evidence">
       <summary>查看数值依据 · {{ report.fact_references.length }} 项引用</summary>
       <p>{{ report.generation_mode==='facts_only' || report.generation_mode==='backend_facts' ? '原始报告仅包含后端统计事实，不包含模型经营解读。' : '数值可回到原结果核对；原因判断与建议仍是模型解读。' }}</p>
@@ -105,5 +110,5 @@ function exportPdf() {
 <style scoped>
 .report-evidence{margin:18px;padding:16px;border:1px solid #cad8cf;border-radius:8px;color:#294c39;font-size:13px;line-height:1.8}.report-evidence summary{cursor:pointer;min-height:28px}.report-evidence p{color:#52685e}.report-evidence ul{padding-left:20px}.report-evidence li{margin:10px 0;overflow-wrap:anywhere}.report-evidence strong{display:block;font-weight:500}.report-evidence a{color:#21654f;text-underline-offset:3px}
 .manual-notes{margin:0 20px 20px;padding:18px;border:1px solid #c5d5c9;border-radius:8px;background:#f7faf8;color:#294c39}.manual-notes h3{font-size:16px;margin:0 0 12px}.manual-notes h4{font-size:14px;margin:18px 0 8px}.manual-notes p{font-size:13px;line-height:1.8;overflow-wrap:anywhere}.manual-notes .manual-content{white-space:pre-wrap}.original-report>summary{padding:12px 20px;color:#21654f;font-size:13px;cursor:pointer;min-height:44px;box-sizing:border-box}
-.report-feedback{margin:0 20px 18px;padding:14px 16px;border:1px solid #d9ccb0;border-radius:7px;background:#fbf8f0;color:#65532d;font-size:13px;line-height:1.8}.report-feedback p{margin:6px 0}
+.report-brief-note{padding:16px 20px;color:#52685e;font-size:14px}.report-feedback{margin:0 20px 18px;padding:14px 16px;border:1px solid #d9ccb0;border-radius:7px;background:#fbf8f0;color:#65532d;font-size:13px;line-height:1.8}.report-feedback p{margin:6px 0}
 </style>

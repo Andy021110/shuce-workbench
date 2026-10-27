@@ -93,5 +93,5 @@ class FactAliasTests(unittest.TestCase):
  def test_valid_advertised_alias_works_in_ordinary_answer(self):
   result=self.agent({'action':'answer','answer':'金额为{{fact:F001}}。','tool_calls':[]}).run('解释选中结果',self.context(),{});self.assertEqual(result.answer,'金额为42.50。')
  def test_invalid_alias_is_not_guessed_and_yields_same_source_facts(self):
-  result=self.agent({'action':'answer','answer':'金额{{fact:F999}}。','tool_calls':[]}).run('解释选中结果',self.context(),{});self.assertEqual(result.report.generation_mode,'facts_only');self.assertIn('42.50',result.report.markdown);self.assertNotIn('F999',result.report.markdown);self.assertTrue(all(f['source_task_id']=='csv' for f in result.report.fact_references))
+  result=self.agent({'action':'answer','answer':'金额{{fact:F999}}。','tool_calls':[]}).run('解释选中结果',self.context(),{});self.assertEqual(result.report.generation_mode,'facts_only');self.assertIn('42.50',result.report.evidence_markdown);self.assertNotIn('F999',result.report.markdown);self.assertTrue(all(f['source_task_id']=='csv' for f in result.report.fact_references))
 if __name__=='__main__':unittest.main()

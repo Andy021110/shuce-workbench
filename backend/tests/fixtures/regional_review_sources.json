@@ -1,0 +1,778 @@
+{
+  "provenance": "Olist public historical aggregates from v12 real execution; no model messages or credentials",
+  "report_query": "请只基于我选中的6份结果，整理一份一页能读完的月会摘要：最多5条结论、3条下一步动作，附一个7—8月商品销售额对比图，不要重复附上所有原始表格。要覆盖销售增长的构成、Top5贡献、为什么不能认定涨价或新品、配送低星的小样本边界，以及那笔订单评论和收货时间为何不矛盾。每条结论标明依据；没有负责人就写待确认，不要再查数据库。",
+  "sources": [
+    {
+      "query": "我是里约地区的电商运营负责人，明天要开2018年8月的经营月会。先帮我比较RJ州健康美容品类8月和7月的表现：已送达订单有多少、商品销售额、单均商品金额、配送超时率各是多少？商品销售额不含运费，按下单月份看。告诉我最值得先查的变化。",
+      "result": {
+        "task_id": "32436cdbf5a0",
+        "result_title": "RJ健康美容品类2018年7—8月表现对比",
+        "columns": [
+          "month",
+          "delivered_orders",
+          "item_sales",
+          "avg_item_sales_per_order",
+          "late_orders",
+          "delivery_late_rate"
+        ],
+        "rows": [
+          {
+            "month": "2018-07",
+            "delivered_orders": 64,
+            "item_sales": 7218.05,
+            "avg_item_sales_per_order": 112.78,
+            "late_orders": 1,
+            "delivery_late_rate": 0.0156
+          },
+          {
+            "month": "2018-08",
+            "delivered_orders": 68,
+            "item_sales": 13098.25,
+            "avg_item_sales_per_order": 192.62,
+            "late_orders": 1,
+            "delivery_late_rate": 0.0147
+          }
+        ],
+        "sql": "WITH __ask_scope_products AS (SELECT p.product_id FROM olist_products_dataset AS p LEFT JOIN product_category_name_translation AS t USING (product_category_name) WHERE COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')), __ask_scope_orders AS (SELECT scope_o.\"order_id\", scope_o.\"customer_id\", scope_o.\"order_status\", scope_o.\"order_purchase_timestamp\", scope_o.\"order_approved_at\", scope_o.\"order_delivered_carrier_date\", scope_o.\"order_delivered_customer_date\", scope_o.\"order_estimated_delivery_date\" FROM olist_orders_dataset AS scope_o WHERE scope_o.order_status IN ('delivered') AND scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ')) AND STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-07', '2018-08') AND scope_o.order_id IN (SELECT scope_i.order_id FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)))), __ask_scope_items AS (SELECT scope_i.\"order_id\", scope_i.\"order_item_id\", scope_i.\"product_id\", scope_i.\"seller_id\", scope_i.\"shipping_limit_date\", scope_i.\"price\", scope_i.\"freight_value\" FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)) AND scope_i.order_id IN (SELECT order_id FROM __ask_scope_orders)), __ask_scope_olist_customers_dataset AS (SELECT scope_row.\"customer_id\", scope_row.\"customer_unique_id\", scope_row.\"customer_zip_code_prefix\", scope_row.\"customer_city\", scope_row.\"customer_state\" FROM olist_customers_dataset AS scope_row WHERE scope_row.customer_id IN (SELECT customer_id FROM __ask_scope_orders)), __ask_scope_olist_products_dataset AS (SELECT scope_row.\"product_id\", scope_row.\"product_category_name\", scope_row.\"product_name_lenght\", scope_row.\"product_description_lenght\", scope_row.\"product_photos_qty\", scope_row.\"product_weight_g\", scope_row.\"product_length_cm\", scope_row.\"product_height_cm\", scope_row.\"product_width_cm\" FROM olist_products_dataset AS scope_row WHERE scope_row.product_id IN (SELECT product_id FROM __ask_scope_items)), __ask_scope_product_category_name_translation AS (SELECT scope_row.\"product_category_name\", scope_row.\"product_category_name_english\" FROM product_category_name_translation AS scope_row WHERE scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))), scope AS (SELECT o.order_id, o.order_status, o.order_purchase_timestamp, o.order_delivered_customer_date, o.order_estimated_delivery_date, STRFTIME(o.order_purchase_timestamp, '%Y-%m') AS month FROM __ask_scope_orders AS o JOIN __ask_scope_olist_customers_dataset AS c ON o.customer_id = c.customer_id WHERE c.customer_state = 'RJ' AND o.order_status = 'delivered' AND o.order_purchase_timestamp >= CAST('2018-07-01 00:00:00' AS TIMESTAMP) AND o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP)), cat_orders AS (SELECT DISTINCT i.order_id FROM __ask_scope_items AS i JOIN __ask_scope_olist_products_dataset AS p ON i.product_id = p.product_id JOIN __ask_scope_product_category_name_translation AS t ON p.product_category_name = t.product_category_name WHERE t.product_category_name_english = 'health_beauty'), item_agg AS (SELECT i.order_id, SUM(i.price) AS item_sales FROM __ask_scope_items AS i JOIN __ask_scope_olist_products_dataset AS p ON i.product_id = p.product_id JOIN __ask_scope_product_category_name_translation AS t ON p.product_category_name = t.product_category_name WHERE t.product_category_name_english = 'health_beauty' GROUP BY i.order_id) SELECT s.month, COUNT(DISTINCT s.order_id) AS delivered_orders, ROUND(SUM(ia.item_sales), 2) AS item_sales, ROUND(SUM(ia.item_sales) / NULLIF(COUNT(DISTINCT s.order_id), 0), 2) AS avg_item_sales_per_order, COUNT(DISTINCT CASE WHEN NOT s.order_delivered_customer_date IS NULL AND NOT s.order_estimated_delivery_date IS NULL AND CAST(s.order_delivered_customer_date AS DATE) > CAST(s.order_estimated_delivery_date AS DATE) THEN s.order_id END) AS late_orders, ROUND(CAST(COUNT(DISTINCT CASE WHEN NOT s.order_delivered_customer_date IS NULL AND NOT s.order_estimated_delivery_date IS NULL AND CAST(s.order_delivered_customer_date AS DATE) > CAST(s.order_estimated_delivery_date AS DATE) THEN s.order_id END) AS DOUBLE) / NULLIF(COUNT(DISTINCT CASE WHEN NOT s.order_delivered_customer_date IS NULL AND NOT s.order_estimated_delivery_date IS NULL THEN s.order_id END), 0), 4) AS delivery_late_rate FROM scope AS s JOIN cat_orders AS co ON s.order_id = co.order_id LEFT JOIN item_agg AS ia ON s.order_id = ia.order_id GROUP BY s.month ORDER BY s.month",
+        "total_rows": 2,
+        "analysis_basis": {
+          "time_field": "order_purchase_timestamp",
+          "time_label": "下单时间",
+          "currency": "BRL",
+          "source": "default",
+          "previous_time_label": null,
+          "note": "月份与日期筛选均按此时间字段；更改日期依据时请明确说明。",
+          "verified_time_fields": [
+            "order_purchase_timestamp"
+          ],
+          "verified": true
+        },
+        "analysis_scope": {
+          "database_id": "olist_ecommerce",
+          "mode": "generated_sql",
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "inherited": false,
+          "time_label": "下单时间",
+          "period_label": "2018-07、2018-08",
+          "statuses": [
+            "已送达"
+          ],
+          "states": [
+            "RJ"
+          ],
+          "categories": [
+            "health_beauty"
+          ],
+          "currency": "BRL",
+          "predicates": [
+            "COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')",
+            "scope_o.order_status IN ('delivered')",
+            "scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ'))",
+            "STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-07', '2018-08')",
+            "scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))",
+            "c.customer_state = 'RJ'",
+            "o.order_status = 'delivered'",
+            "o.order_purchase_timestamp >= CAST('2018-07-01 00:00:00' AS TIMESTAMP)",
+            "o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP)",
+            "t.product_category_name_english = 'health_beauty'",
+            "customer_state IN ('RJ')"
+          ],
+          "note": "已由后端施加本次确认的结构化范围；自由查询的其他条件仍需核对 SQL。选中品类时，订单数为包含该品类的订单；商品金额和明细条数仅统计选中品类；支付等订单级指标未按品类分摊。配送超时率仍只比较范围内已送达且实际、预计日期齐全的订单；目标仅适用于填写时的范围。"
+        },
+        "query_intent": {
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "all_statuses": false,
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "periods": [
+            "2018-07",
+            "2018-08"
+          ],
+          "grain": null,
+          "time_field": "order_purchase_timestamp",
+          "validated": true,
+          "validation_version": 2,
+          "can_continue": true
+        }
+      }
+    },
+    {
+      "query": "8月单均商品金额涨了这么多，是因为涨价了吗？请保持刚才的范围，把7月和8月的单均商品金额拆成“每单健康美容商品件数”和“健康美容商品平均每件金额”，帮我判断先查价格还是购买结构。",
+      "result": {
+        "task_id": "3cfaf871d550",
+        "result_title": "RJ健康美容2018年7—8月每单件数与平均每件金额",
+        "columns": [
+          "order_month",
+          "order_count",
+          "item_count",
+          "items_per_order",
+          "item_sales",
+          "avg_item_price"
+        ],
+        "rows": [
+          {
+            "order_month": "2018-07",
+            "order_count": 64,
+            "item_count": 73,
+            "items_per_order": 1.14,
+            "item_sales": 7218.05,
+            "avg_item_price": 98.88
+          },
+          {
+            "order_month": "2018-08",
+            "order_count": 68,
+            "item_count": 77,
+            "items_per_order": 1.13,
+            "item_sales": 13098.25,
+            "avg_item_price": 170.11
+          }
+        ],
+        "sql": "WITH __ask_scope_products AS (SELECT p.product_id FROM olist_products_dataset AS p LEFT JOIN product_category_name_translation AS t USING (product_category_name) WHERE COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')), __ask_scope_orders AS (SELECT scope_o.\"order_id\", scope_o.\"customer_id\", scope_o.\"order_status\", scope_o.\"order_purchase_timestamp\", scope_o.\"order_approved_at\", scope_o.\"order_delivered_carrier_date\", scope_o.\"order_delivered_customer_date\", scope_o.\"order_estimated_delivery_date\" FROM olist_orders_dataset AS scope_o WHERE scope_o.order_status IN ('delivered') AND scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ')) AND STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-07', '2018-08') AND scope_o.order_id IN (SELECT scope_i.order_id FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)))), __ask_scope_items AS (SELECT scope_i.\"order_id\", scope_i.\"order_item_id\", scope_i.\"product_id\", scope_i.\"seller_id\", scope_i.\"shipping_limit_date\", scope_i.\"price\", scope_i.\"freight_value\" FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)) AND scope_i.order_id IN (SELECT order_id FROM __ask_scope_orders)), __ask_scope_olist_customers_dataset AS (SELECT scope_row.\"customer_id\", scope_row.\"customer_unique_id\", scope_row.\"customer_zip_code_prefix\", scope_row.\"customer_city\", scope_row.\"customer_state\" FROM olist_customers_dataset AS scope_row WHERE scope_row.customer_id IN (SELECT customer_id FROM __ask_scope_orders)), __ask_scope_olist_products_dataset AS (SELECT scope_row.\"product_id\", scope_row.\"product_category_name\", scope_row.\"product_name_lenght\", scope_row.\"product_description_lenght\", scope_row.\"product_photos_qty\", scope_row.\"product_weight_g\", scope_row.\"product_length_cm\", scope_row.\"product_height_cm\", scope_row.\"product_width_cm\" FROM olist_products_dataset AS scope_row WHERE scope_row.product_id IN (SELECT product_id FROM __ask_scope_items)), __ask_scope_product_category_name_translation AS (SELECT scope_row.\"product_category_name\", scope_row.\"product_category_name_english\" FROM product_category_name_translation AS scope_row WHERE scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))), hb_items AS (SELECT oi.order_id, COUNT(*) AS item_cnt, SUM(oi.price) AS item_sales FROM __ask_scope_items AS oi JOIN __ask_scope_olist_products_dataset AS p ON oi.product_id = p.product_id JOIN __ask_scope_product_category_name_translation AS t ON p.product_category_name = t.product_category_name WHERE t.product_category_name_english = 'health_beauty' GROUP BY oi.order_id) SELECT STRFTIME(o.order_purchase_timestamp, '%Y-%m') AS order_month, COUNT(DISTINCT o.order_id) AS order_count, SUM(hb.item_cnt) AS item_count, ROUND(SUM(hb.item_cnt) * 1.0 / COUNT(DISTINCT o.order_id), 2) AS items_per_order, ROUND(SUM(hb.item_sales), 2) AS item_sales, ROUND(SUM(hb.item_sales) / NULLIF(SUM(hb.item_cnt), 0), 2) AS avg_item_price FROM __ask_scope_orders AS o JOIN __ask_scope_olist_customers_dataset AS c ON o.customer_id = c.customer_id JOIN hb_items AS hb ON o.order_id = hb.order_id WHERE c.customer_state = 'RJ' AND o.order_status = 'delivered' AND o.order_purchase_timestamp >= CAST('2018-07-01 00:00:00' AS TIMESTAMP) AND o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP) GROUP BY 1 ORDER BY 1",
+        "total_rows": 2,
+        "analysis_basis": {
+          "time_field": "order_purchase_timestamp",
+          "time_label": "下单时间",
+          "currency": "BRL",
+          "source": "inherited",
+          "previous_time_label": null,
+          "note": "月份与日期筛选均按此时间字段；更改日期依据时请明确说明。",
+          "verified_time_fields": [
+            "order_purchase_timestamp"
+          ],
+          "verified": true
+        },
+        "analysis_scope": {
+          "database_id": "olist_ecommerce",
+          "mode": "generated_sql",
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "inherited": true,
+          "time_label": "下单时间",
+          "period_label": "2018-07、2018-08",
+          "statuses": [
+            "已送达"
+          ],
+          "states": [
+            "RJ"
+          ],
+          "categories": [
+            "health_beauty"
+          ],
+          "currency": "BRL",
+          "predicates": [
+            "c.customer_state = 'RJ'",
+            "o.order_status = 'delivered'",
+            "o.order_purchase_timestamp >= CAST('2018-07-01 00:00:00' AS TIMESTAMP)",
+            "o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP)",
+            "COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')",
+            "scope_o.order_status IN ('delivered')",
+            "scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ'))",
+            "STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-07', '2018-08')",
+            "scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))",
+            "t.product_category_name_english = 'health_beauty'",
+            "customer_state IN ('RJ')"
+          ],
+          "note": "已由后端施加本次确认的结构化范围；自由查询的其他条件仍需核对 SQL。选中品类时，订单数为包含该品类的订单；商品金额和明细条数仅统计选中品类；支付等订单级指标未按品类分摊。配送超时率仍只比较范围内已送达且实际、预计日期齐全的订单；目标仅适用于填写时的范围。"
+        },
+        "query_intent": {
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "all_statuses": false,
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "periods": [
+            "2018-07",
+            "2018-08"
+          ],
+          "grain": null,
+          "time_field": "order_purchase_timestamp",
+          "validated": true,
+          "validation_version": 2,
+          "can_continue": true
+        }
+      }
+    },
+    {
+      "query": "那继续查商品结构。还是刚才RJ健康美容已送达、按下单月份的范围，找出8月相对7月商品销售额增加最多的5个商品。给我两个个月各卖了几件、各有多少商品销售额、平均每件金额和销售额增量；7月没卖、8月新卖的商品也算进去。再告诉我这5个商品解释了总体增长的多少。",
+      "result": {
+        "task_id": "148743cb629a",
+        "result_title": "RJ健康美容2018年8月销售额增量Top5商品",
+        "columns": [
+          "product_id",
+          "qty_jul",
+          "sales_jul",
+          "avg_price_jul",
+          "qty_aug",
+          "sales_aug",
+          "avg_price_aug",
+          "sales_delta",
+          "top5_share_of_total_delta"
+        ],
+        "rows": [
+          {
+            "product_id": "89f59eee27a6a49b9f0d887136c71cd4",
+            "qty_jul": 0,
+            "sales_jul": 0.0,
+            "avg_price_jul": null,
+            "qty_aug": 1,
+            "sales_aug": 1299.65,
+            "avg_price_aug": 1299.65,
+            "sales_delta": 1299.65,
+            "top5_share_of_total_delta": 0.8339
+          },
+          {
+            "product_id": "c87a617241993d71f043ed39858daa43",
+            "qty_jul": 0,
+            "sales_jul": 0.0,
+            "avg_price_jul": null,
+            "qty_aug": 2,
+            "sales_aug": 1288.0,
+            "avg_price_aug": 644.0,
+            "sales_delta": 1288.0,
+            "top5_share_of_total_delta": 0.8339
+          },
+          {
+            "product_id": "43cc8e4d981bc04b9d78b12e8a908d41",
+            "qty_jul": 0,
+            "sales_jul": 0.0,
+            "avg_price_jul": null,
+            "qty_aug": 1,
+            "sales_aug": 1240.0,
+            "avg_price_aug": 1240.0,
+            "sales_delta": 1240.0,
+            "top5_share_of_total_delta": 0.8339
+          },
+          {
+            "product_id": "5d9da5147623b060b44db5b01bf9e60a",
+            "qty_jul": 0,
+            "sales_jul": 0.0,
+            "avg_price_jul": null,
+            "qty_aug": 1,
+            "sales_aug": 548.0,
+            "avg_price_aug": 548.0,
+            "sales_delta": 548.0,
+            "top5_share_of_total_delta": 0.8339
+          },
+          {
+            "product_id": "f7740e5b4337a3cc4a8a204553101a85",
+            "qty_jul": 0,
+            "sales_jul": 0.0,
+            "avg_price_jul": null,
+            "qty_aug": 1,
+            "sales_aug": 527.9,
+            "avg_price_aug": 527.9,
+            "sales_delta": 527.9,
+            "top5_share_of_total_delta": 0.8339
+          }
+        ],
+        "sql": "WITH __ask_scope_products AS (SELECT p.product_id FROM olist_products_dataset AS p LEFT JOIN product_category_name_translation AS t USING (product_category_name) WHERE COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')), __ask_scope_orders AS (SELECT scope_o.\"order_id\", scope_o.\"customer_id\", scope_o.\"order_status\", scope_o.\"order_purchase_timestamp\", scope_o.\"order_approved_at\", scope_o.\"order_delivered_carrier_date\", scope_o.\"order_delivered_customer_date\", scope_o.\"order_estimated_delivery_date\" FROM olist_orders_dataset AS scope_o WHERE scope_o.order_status IN ('delivered') AND scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ')) AND STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-07', '2018-08') AND scope_o.order_id IN (SELECT scope_i.order_id FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)))), __ask_scope_items AS (SELECT scope_i.\"order_id\", scope_i.\"order_item_id\", scope_i.\"product_id\", scope_i.\"seller_id\", scope_i.\"shipping_limit_date\", scope_i.\"price\", scope_i.\"freight_value\" FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)) AND scope_i.order_id IN (SELECT order_id FROM __ask_scope_orders)), __ask_scope_olist_customers_dataset AS (SELECT scope_row.\"customer_id\", scope_row.\"customer_unique_id\", scope_row.\"customer_zip_code_prefix\", scope_row.\"customer_city\", scope_row.\"customer_state\" FROM olist_customers_dataset AS scope_row WHERE scope_row.customer_id IN (SELECT customer_id FROM __ask_scope_orders)), __ask_scope_olist_products_dataset AS (SELECT scope_row.\"product_id\", scope_row.\"product_category_name\", scope_row.\"product_name_lenght\", scope_row.\"product_description_lenght\", scope_row.\"product_photos_qty\", scope_row.\"product_weight_g\", scope_row.\"product_length_cm\", scope_row.\"product_height_cm\", scope_row.\"product_width_cm\" FROM olist_products_dataset AS scope_row WHERE scope_row.product_id IN (SELECT product_id FROM __ask_scope_items)), __ask_scope_product_category_name_translation AS (SELECT scope_row.\"product_category_name\", scope_row.\"product_category_name_english\" FROM product_category_name_translation AS scope_row WHERE scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))), base AS (SELECT i.product_id, STRFTIME(o.order_purchase_timestamp, '%Y-%m') AS ym, i.price FROM __ask_scope_items AS i JOIN __ask_scope_orders AS o ON i.order_id = o.order_id JOIN __ask_scope_olist_customers_dataset AS c ON o.customer_id = c.customer_id JOIN __ask_scope_olist_products_dataset AS p ON i.product_id = p.product_id JOIN __ask_scope_product_category_name_translation AS t ON p.product_category_name = t.product_category_name WHERE c.customer_state = 'RJ' AND o.order_status = 'delivered' AND t.product_category_name_english = 'health_beauty' AND o.order_purchase_timestamp >= CAST('2018-07-01 00:00:00' AS TIMESTAMP) AND o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP)), prod AS (SELECT product_id, SUM(CASE WHEN ym = '2018-07' THEN 1 ELSE 0 END) AS qty_jul, SUM(CASE WHEN ym = '2018-07' THEN price ELSE 0 END) AS sales_jul, SUM(CASE WHEN ym = '2018-08' THEN 1 ELSE 0 END) AS qty_aug, SUM(CASE WHEN ym = '2018-08' THEN price ELSE 0 END) AS sales_aug FROM base GROUP BY product_id), ranked AS (SELECT product_id, qty_jul, sales_jul, qty_aug, sales_aug, sales_aug - sales_jul AS sales_delta FROM prod ORDER BY sales_delta DESC, product_id ASC LIMIT 5), total AS (SELECT SUM(CASE WHEN ym = '2018-08' THEN price ELSE 0 END) - SUM(CASE WHEN ym = '2018-07' THEN price ELSE 0 END) AS total_delta FROM base) SELECT r.product_id, r.qty_jul, r.sales_jul, ROUND(r.sales_jul / NULLIF(r.qty_jul, 0), 2) AS avg_price_jul, r.qty_aug, r.sales_aug, ROUND(r.sales_aug / NULLIF(r.qty_aug, 0), 2) AS avg_price_aug, ROUND(r.sales_delta, 2) AS sales_delta, ROUND((SELECT SUM(sales_delta) FROM ranked) / NULLIF(t.total_delta, 0), 4) AS top5_share_of_total_delta FROM ranked AS r CROSS JOIN total AS t ORDER BY r.sales_delta DESC, r.product_id ASC",
+        "total_rows": 5,
+        "analysis_basis": {
+          "time_field": "order_purchase_timestamp",
+          "time_label": "下单时间",
+          "currency": "BRL",
+          "source": "inherited",
+          "previous_time_label": null,
+          "note": "月份与日期筛选均按此时间字段；更改日期依据时请明确说明。",
+          "verified_time_fields": [
+            "order_purchase_timestamp"
+          ],
+          "verified": true
+        },
+        "analysis_scope": {
+          "database_id": "olist_ecommerce",
+          "mode": "generated_sql",
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "inherited": true,
+          "time_label": "下单时间",
+          "period_label": "2018-07、2018-08",
+          "statuses": [
+            "已送达"
+          ],
+          "states": [
+            "RJ"
+          ],
+          "categories": [
+            "health_beauty"
+          ],
+          "currency": "BRL",
+          "predicates": [
+            "COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')",
+            "scope_o.order_status IN ('delivered')",
+            "scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ'))",
+            "STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-07', '2018-08')",
+            "scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))",
+            "c.customer_state = 'RJ'",
+            "o.order_status = 'delivered'",
+            "t.product_category_name_english = 'health_beauty'",
+            "o.order_purchase_timestamp >= CAST('2018-07-01 00:00:00' AS TIMESTAMP)",
+            "o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP)",
+            "customer_state IN ('RJ')"
+          ],
+          "note": "已由后端施加本次确认的结构化范围；自由查询的其他条件仍需核对 SQL。选中品类时，订单数为包含该品类的订单；商品金额和明细条数仅统计选中品类；支付等订单级指标未按品类分摊。配送超时率仍只比较范围内已送达且实际、预计日期齐全的订单；目标仅适用于填写时的范围。"
+        },
+        "query_intent": {
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "all_statuses": false,
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "periods": [
+            "2018-07",
+            "2018-08"
+          ],
+          "grain": null,
+          "time_field": "order_purchase_timestamp",
+          "validated": true,
+          "validation_version": 2,
+          "can_continue": true
+        }
+      }
+    },
+    {
+      "query": "再检查服务质量，重新看RJ州健康美容品类2018年7月和8月的全部已送达订单，不限定刚才5个商品，按下单月份统计。每月分正常配送和超时配送，列订单数、已评价订单数、未评价订单数、低星订单数、低星率。1或2星算低星，同一订单有多条评价只算一次，低星率分母用已评价订单。样本足够支持“配送超时导致差评”吗？",
+      "result": {
+        "task_id": "0c7589240b0f",
+        "result_title": "RJ健康美容2018年7—8月配送与评价对比",
+        "columns": [
+          "month",
+          "delivery_group",
+          "order_count",
+          "reviewed_orders",
+          "unreviewed_orders",
+          "low_star_orders",
+          "low_star_rate"
+        ],
+        "rows": [
+          {
+            "month": "2018-07",
+            "delivery_group": "late",
+            "order_count": 1,
+            "reviewed_orders": 1,
+            "unreviewed_orders": 0,
+            "low_star_orders": 1,
+            "low_star_rate": 1.0
+          },
+          {
+            "month": "2018-07",
+            "delivery_group": "on_time",
+            "order_count": 63,
+            "reviewed_orders": 62,
+            "unreviewed_orders": 1,
+            "low_star_orders": 5,
+            "low_star_rate": 0.0806
+          },
+          {
+            "month": "2018-08",
+            "delivery_group": "late",
+            "order_count": 1,
+            "reviewed_orders": 1,
+            "unreviewed_orders": 0,
+            "low_star_orders": 1,
+            "low_star_rate": 1.0
+          },
+          {
+            "month": "2018-08",
+            "delivery_group": "on_time",
+            "order_count": 67,
+            "reviewed_orders": 67,
+            "unreviewed_orders": 0,
+            "low_star_orders": 3,
+            "low_star_rate": 0.0448
+          }
+        ],
+        "sql": "WITH __ask_scope_products AS (SELECT p.product_id FROM olist_products_dataset AS p LEFT JOIN product_category_name_translation AS t USING (product_category_name) WHERE COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')), __ask_scope_orders AS (SELECT scope_o.\"order_id\", scope_o.\"customer_id\", scope_o.\"order_status\", scope_o.\"order_purchase_timestamp\", scope_o.\"order_approved_at\", scope_o.\"order_delivered_carrier_date\", scope_o.\"order_delivered_customer_date\", scope_o.\"order_estimated_delivery_date\" FROM olist_orders_dataset AS scope_o WHERE scope_o.order_status IN ('delivered') AND scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ')) AND STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-07', '2018-08') AND scope_o.order_id IN (SELECT scope_i.order_id FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)))), __ask_scope_items AS (SELECT scope_i.\"order_id\", scope_i.\"order_item_id\", scope_i.\"product_id\", scope_i.\"seller_id\", scope_i.\"shipping_limit_date\", scope_i.\"price\", scope_i.\"freight_value\" FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)) AND scope_i.order_id IN (SELECT order_id FROM __ask_scope_orders)), __ask_scope_olist_customers_dataset AS (SELECT scope_row.\"customer_id\", scope_row.\"customer_unique_id\", scope_row.\"customer_zip_code_prefix\", scope_row.\"customer_city\", scope_row.\"customer_state\" FROM olist_customers_dataset AS scope_row WHERE scope_row.customer_id IN (SELECT customer_id FROM __ask_scope_orders)), __ask_scope_olist_order_reviews_dataset AS (SELECT scope_row.\"review_id\", scope_row.\"order_id\", scope_row.\"review_score\", scope_row.\"review_comment_title\", scope_row.\"review_comment_message\", scope_row.\"review_creation_date\", scope_row.\"review_answer_timestamp\" FROM olist_order_reviews_dataset AS scope_row WHERE scope_row.order_id IN (SELECT order_id FROM __ask_scope_orders)), __ask_scope_olist_products_dataset AS (SELECT scope_row.\"product_id\", scope_row.\"product_category_name\", scope_row.\"product_name_lenght\", scope_row.\"product_description_lenght\", scope_row.\"product_photos_qty\", scope_row.\"product_weight_g\", scope_row.\"product_length_cm\", scope_row.\"product_height_cm\", scope_row.\"product_width_cm\" FROM olist_products_dataset AS scope_row WHERE scope_row.product_id IN (SELECT product_id FROM __ask_scope_items)), __ask_scope_product_category_name_translation AS (SELECT scope_row.\"product_category_name\", scope_row.\"product_category_name_english\" FROM product_category_name_translation AS scope_row WHERE scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))), cat_orders AS (SELECT DISTINCT oi.order_id FROM __ask_scope_items AS oi JOIN __ask_scope_olist_products_dataset AS p ON oi.product_id = p.product_id JOIN __ask_scope_product_category_name_translation AS t ON p.product_category_name = t.product_category_name WHERE t.product_category_name_english = 'health_beauty'), rev AS (SELECT order_id, MIN(review_score) AS score FROM __ask_scope_olist_order_reviews_dataset AS olist_order_reviews_dataset GROUP BY order_id), base AS (SELECT o.order_id, STRFTIME(o.order_purchase_timestamp, '%Y-%m') AS month, CASE WHEN CAST(o.order_delivered_customer_date AS DATE) > CAST(o.order_estimated_delivery_date AS DATE) THEN 'late' ELSE 'on_time' END AS delivery_group, r.score FROM __ask_scope_orders AS o JOIN __ask_scope_olist_customers_dataset AS c ON o.customer_id = c.customer_id JOIN cat_orders AS co ON o.order_id = co.order_id LEFT JOIN rev AS r ON o.order_id = r.order_id WHERE o.order_status = 'delivered' AND c.customer_state = 'RJ' AND o.order_purchase_timestamp >= CAST('2018-07-01 00:00:00' AS TIMESTAMP) AND o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP) AND NOT o.order_delivered_customer_date IS NULL AND NOT o.order_estimated_delivery_date IS NULL) SELECT month, delivery_group, COUNT(DISTINCT order_id) AS order_count, COUNT(DISTINCT CASE WHEN NOT score IS NULL THEN order_id END) AS reviewed_orders, COUNT(DISTINCT CASE WHEN score IS NULL THEN order_id END) AS unreviewed_orders, COUNT(DISTINCT CASE WHEN score IN (1, 2) THEN order_id END) AS low_star_orders, ROUND(COUNT(DISTINCT CASE WHEN score IN (1, 2) THEN order_id END) * 1.0 / NULLIF(COUNT(DISTINCT CASE WHEN NOT score IS NULL THEN order_id END), 0), 4) AS low_star_rate FROM base GROUP BY month, delivery_group ORDER BY month, delivery_group",
+        "total_rows": 4,
+        "analysis_basis": {
+          "time_field": "order_purchase_timestamp",
+          "time_label": "下单时间",
+          "currency": "BRL",
+          "source": "inherited",
+          "previous_time_label": null,
+          "note": "月份与日期筛选均按此时间字段；更改日期依据时请明确说明。",
+          "verified_time_fields": [
+            "order_purchase_timestamp"
+          ],
+          "verified": true
+        },
+        "analysis_scope": {
+          "database_id": "olist_ecommerce",
+          "mode": "generated_sql",
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "inherited": true,
+          "time_label": "下单时间",
+          "period_label": "2018-07、2018-08",
+          "statuses": [
+            "已送达"
+          ],
+          "states": [
+            "RJ"
+          ],
+          "categories": [
+            "health_beauty"
+          ],
+          "currency": "BRL",
+          "predicates": [
+            "COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')",
+            "scope_o.order_status IN ('delivered')",
+            "scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ'))",
+            "STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-07', '2018-08')",
+            "scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))",
+            "t.product_category_name_english = 'health_beauty'",
+            "o.order_status = 'delivered'",
+            "c.customer_state = 'RJ'",
+            "o.order_purchase_timestamp >= CAST('2018-07-01 00:00:00' AS TIMESTAMP)",
+            "o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP)",
+            "customer_state IN ('RJ')"
+          ],
+          "note": "已由后端施加本次确认的结构化范围；自由查询的其他条件仍需核对 SQL。选中品类时，订单数为包含该品类的订单；商品金额和明细条数仅统计选中品类；支付等订单级指标未按品类分摊。配送超时率仍只比较范围内已送达且实际、预计日期齐全的订单；目标仅适用于填写时的范围。"
+        },
+        "query_intent": {
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "all_statuses": false,
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "periods": [
+            "2018-07",
+            "2018-08"
+          ],
+          "grain": "month",
+          "time_field": "order_purchase_timestamp",
+          "validated": true,
+          "validation_version": 2,
+          "can_continue": false
+        }
+      }
+    },
+    {
+      "query": "先做逐单核查。请列出RJ州健康美容品类2018年8月下单、已送达且配送超时的订单，给订单号、客户城市、预计和实际送达日期、超时天数、最低评价星级、评价标题和正文、该订单健康美容商品金额。每笔订单一行，日期仍按下单月份，不限于刚才增长Top5商品。",
+      "result": {
+        "task_id": "d0b41aea0b9e",
+        "result_title": "RJ健康美容2018年8月配送超时订单明细",
+        "columns": [
+          "order_id",
+          "customer_city",
+          "order_estimated_delivery_date",
+          "order_delivered_customer_date",
+          "late_days",
+          "min_review_score",
+          "review_comment_title",
+          "review_comment_message",
+          "hb_item_sales"
+        ],
+        "rows": [
+          {
+            "order_id": "c5a2bd922645770b148755d89a577853",
+            "customer_city": "rio de janeiro",
+            "order_estimated_delivery_date": "2018-08-24",
+            "order_delivered_customer_date": "2018-08-30",
+            "late_days": 6,
+            "min_review_score": 1,
+            "review_comment_title": "Nao entregue",
+            "review_comment_message": "Minha compra ainda está presa nos correios. Sei que não é culpa da loja, mas algo deve ser feito! Preciso do equipamento para trabalhar e ele não chegou!",
+            "hb_item_sales": 199.08
+          }
+        ],
+        "sql": "WITH __ask_scope_products AS (SELECT p.product_id FROM olist_products_dataset AS p LEFT JOIN product_category_name_translation AS t USING (product_category_name) WHERE COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')), __ask_scope_orders AS (SELECT scope_o.\"order_id\", scope_o.\"customer_id\", scope_o.\"order_status\", scope_o.\"order_purchase_timestamp\", scope_o.\"order_approved_at\", scope_o.\"order_delivered_carrier_date\", scope_o.\"order_delivered_customer_date\", scope_o.\"order_estimated_delivery_date\" FROM olist_orders_dataset AS scope_o WHERE scope_o.order_status IN ('delivered') AND scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ')) AND STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-08') AND scope_o.order_id IN (SELECT scope_i.order_id FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)))), __ask_scope_items AS (SELECT scope_i.\"order_id\", scope_i.\"order_item_id\", scope_i.\"product_id\", scope_i.\"seller_id\", scope_i.\"shipping_limit_date\", scope_i.\"price\", scope_i.\"freight_value\" FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)) AND scope_i.order_id IN (SELECT order_id FROM __ask_scope_orders)), __ask_scope_olist_customers_dataset AS (SELECT scope_row.\"customer_id\", scope_row.\"customer_unique_id\", scope_row.\"customer_zip_code_prefix\", scope_row.\"customer_city\", scope_row.\"customer_state\" FROM olist_customers_dataset AS scope_row WHERE scope_row.customer_id IN (SELECT customer_id FROM __ask_scope_orders)), __ask_scope_olist_order_reviews_dataset AS (SELECT scope_row.\"review_id\", scope_row.\"order_id\", scope_row.\"review_score\", scope_row.\"review_comment_title\", scope_row.\"review_comment_message\", scope_row.\"review_creation_date\", scope_row.\"review_answer_timestamp\" FROM olist_order_reviews_dataset AS scope_row WHERE scope_row.order_id IN (SELECT order_id FROM __ask_scope_orders)), __ask_scope_olist_products_dataset AS (SELECT scope_row.\"product_id\", scope_row.\"product_category_name\", scope_row.\"product_name_lenght\", scope_row.\"product_description_lenght\", scope_row.\"product_photos_qty\", scope_row.\"product_weight_g\", scope_row.\"product_length_cm\", scope_row.\"product_height_cm\", scope_row.\"product_width_cm\" FROM olist_products_dataset AS scope_row WHERE scope_row.product_id IN (SELECT product_id FROM __ask_scope_items)), __ask_scope_product_category_name_translation AS (SELECT scope_row.\"product_category_name\", scope_row.\"product_category_name_english\" FROM product_category_name_translation AS scope_row WHERE scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))), hb_items AS (SELECT oi.order_id, SUM(oi.price) AS hb_item_sales FROM __ask_scope_items AS oi JOIN __ask_scope_olist_products_dataset AS p ON oi.product_id = p.product_id JOIN __ask_scope_product_category_name_translation AS t ON p.product_category_name = t.product_category_name WHERE t.product_category_name_english = 'health_beauty' GROUP BY oi.order_id), rev AS (SELECT order_id, MIN(review_score) AS min_review_score, MIN(review_comment_title) AS review_comment_title, MIN(review_comment_message) AS review_comment_message FROM __ask_scope_olist_order_reviews_dataset AS olist_order_reviews_dataset GROUP BY order_id) SELECT o.order_id, c.customer_city, CAST(o.order_estimated_delivery_date AS DATE) AS order_estimated_delivery_date, CAST(o.order_delivered_customer_date AS DATE) AS order_delivered_customer_date, DATE_DIFF('DAY', CAST(o.order_estimated_delivery_date AS DATE), CAST(o.order_delivered_customer_date AS DATE)) AS late_days, r.min_review_score, r.review_comment_title, r.review_comment_message, hb.hb_item_sales FROM __ask_scope_orders AS o JOIN __ask_scope_olist_customers_dataset AS c ON o.customer_id = c.customer_id JOIN hb_items AS hb ON o.order_id = hb.order_id LEFT JOIN rev AS r ON o.order_id = r.order_id WHERE c.customer_state = 'RJ' AND o.order_status = 'delivered' AND o.order_purchase_timestamp >= CAST('2018-08-01 00:00:00' AS TIMESTAMP) AND o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP) AND NOT o.order_delivered_customer_date IS NULL AND NOT o.order_estimated_delivery_date IS NULL AND CAST(o.order_delivered_customer_date AS DATE) > CAST(o.order_estimated_delivery_date AS DATE) ORDER BY o.order_id",
+        "total_rows": 1,
+        "analysis_basis": {
+          "time_field": "order_purchase_timestamp",
+          "time_label": "下单时间",
+          "currency": "BRL",
+          "source": "inherited",
+          "previous_time_label": null,
+          "note": "月份与日期筛选均按此时间字段；更改日期依据时请明确说明。",
+          "verified_time_fields": [
+            "order_purchase_timestamp"
+          ],
+          "verified": true
+        },
+        "analysis_scope": {
+          "database_id": "olist_ecommerce",
+          "mode": "generated_sql",
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "inherited": true,
+          "time_label": "下单时间",
+          "period_label": "2018-08",
+          "statuses": [
+            "已送达"
+          ],
+          "states": [
+            "RJ"
+          ],
+          "categories": [
+            "health_beauty"
+          ],
+          "currency": "BRL",
+          "predicates": [
+            "c.customer_state = 'RJ'",
+            "o.order_status = 'delivered'",
+            "o.order_purchase_timestamp >= CAST('2018-08-01 00:00:00' AS TIMESTAMP)",
+            "o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP)",
+            "COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')",
+            "scope_o.order_status IN ('delivered')",
+            "scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ'))",
+            "STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-08')",
+            "scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))",
+            "t.product_category_name_english = 'health_beauty'",
+            "customer_state IN ('RJ')"
+          ],
+          "note": "已由后端施加本次确认的结构化范围；自由查询的其他条件仍需核对 SQL。选中品类时，订单数为包含该品类的订单；商品金额和明细条数仅统计选中品类；支付等订单级指标未按品类分摊。配送超时率仍只比较范围内已送达且实际、预计日期齐全的订单；目标仅适用于填写时的范围。"
+        },
+        "query_intent": {
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "all_statuses": false,
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "periods": [
+            "2018-08"
+          ],
+          "grain": null,
+          "time_field": "order_purchase_timestamp",
+          "validated": true,
+          "validation_version": 2,
+          "can_continue": false
+        }
+      }
+    },
+    {
+      "query": "订单c5a2bd922645770b148755d89a577853现在是已送达，评价却说没收到，看上去矛盾。请查这笔订单的下单时间、预计送达、实际送达、评价问卷创建时间和客户实际回复时间，按先后解释是不是评论写在收货之前。评价回复时间为空的话就明确说不知道，不要拿问卷创建时间代替。",
+      "result": {
+        "task_id": "5619f50a2bb6",
+        "result_title": "订单c5a2bd922645770b148755d89a577853的时间节点",
+        "columns": [
+          "order_id",
+          "order_purchase_timestamp",
+          "order_estimated_delivery_date",
+          "order_delivered_customer_date",
+          "review_creation_date",
+          "review_answer_timestamp"
+        ],
+        "rows": [
+          {
+            "order_id": "c5a2bd922645770b148755d89a577853",
+            "order_purchase_timestamp": "2018-08-10T10:02:39",
+            "order_estimated_delivery_date": "2018-08-24T00:00:00",
+            "order_delivered_customer_date": "2018-08-30T16:18:30",
+            "review_creation_date": "2018-08-29T00:00:00",
+            "review_answer_timestamp": "2018-08-29T13:27:46"
+          }
+        ],
+        "sql": "WITH __ask_scope_products AS (SELECT p.product_id FROM olist_products_dataset AS p LEFT JOIN product_category_name_translation AS t USING (product_category_name) WHERE COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')), __ask_scope_orders AS (SELECT scope_o.\"order_id\", scope_o.\"customer_id\", scope_o.\"order_status\", scope_o.\"order_purchase_timestamp\", scope_o.\"order_approved_at\", scope_o.\"order_delivered_carrier_date\", scope_o.\"order_delivered_customer_date\", scope_o.\"order_estimated_delivery_date\" FROM olist_orders_dataset AS scope_o WHERE scope_o.order_status IN ('delivered') AND scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ')) AND scope_o.order_id IN (SELECT scope_i.order_id FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)))), __ask_scope_olist_order_reviews_dataset AS (SELECT scope_row.\"review_id\", scope_row.\"order_id\", scope_row.\"review_score\", scope_row.\"review_comment_title\", scope_row.\"review_comment_message\", scope_row.\"review_creation_date\", scope_row.\"review_answer_timestamp\" FROM olist_order_reviews_dataset AS scope_row WHERE scope_row.order_id IN (SELECT order_id FROM __ask_scope_orders)) SELECT o.order_id, o.order_purchase_timestamp, o.order_estimated_delivery_date, o.order_delivered_customer_date, r.review_creation_date, r.review_answer_timestamp FROM __ask_scope_orders AS o LEFT JOIN __ask_scope_olist_order_reviews_dataset AS r ON r.order_id = o.order_id WHERE o.order_id = 'c5a2bd922645770b148755d89a577853' ORDER BY r.review_creation_date",
+        "total_rows": 1,
+        "analysis_basis": {
+          "time_field": "order_purchase_timestamp",
+          "time_label": "下单时间",
+          "currency": "BRL",
+          "source": "inherited",
+          "previous_time_label": null,
+          "note": "月份与日期筛选均按此时间字段；更改日期依据时请明确说明。",
+          "verified_time_fields": [],
+          "verified": false
+        },
+        "analysis_scope": {
+          "database_id": "olist_ecommerce",
+          "mode": "generated_sql",
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "inherited": true,
+          "time_label": "下单时间",
+          "period_label": "日期条件见下方 SQL 范围",
+          "statuses": [
+            "已送达"
+          ],
+          "states": [
+            "RJ"
+          ],
+          "categories": [
+            "health_beauty"
+          ],
+          "currency": "BRL",
+          "predicates": [
+            "COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')",
+            "scope_o.order_status IN ('delivered')",
+            "scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ'))",
+            "customer_state IN ('RJ')"
+          ],
+          "note": "已由后端施加本次确认的结构化范围；自由查询的其他条件仍需核对 SQL。选中品类时，订单数为包含该品类的订单；商品金额和明细条数仅统计选中品类；支付等订单级指标未按品类分摊。配送超时率仍只比较范围内已送达且实际、预计日期齐全的订单；目标仅适用于填写时的范围。"
+        },
+        "query_intent": {
+          "exclusions": {
+            "states": [],
+            "order_statuses": [],
+            "categories": []
+          },
+          "all_statuses": false,
+          "filters": {
+            "states": [
+              "RJ"
+            ],
+            "order_statuses": [
+              "delivered"
+            ],
+            "categories": [
+              "health_beauty"
+            ]
+          },
+          "periods": [],
+          "grain": null,
+          "time_field": "order_purchase_timestamp",
+          "validated": true,
+          "validation_version": 2,
+          "can_continue": false
+        }
+      }
+    }
+  ]
+}

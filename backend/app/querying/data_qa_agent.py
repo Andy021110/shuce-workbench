@@ -12,6 +12,7 @@ from ..model_client import ModelClient
 from ..models import AnalysisReport, VisualizationSpec
 from ..skills import SkillDefinition
 from ..report_facts import build_facts, validate_and_render, source_items, factual_brief, LABELS
+from ..report_delivery import preferences, validation_code, merge_charts
 
 
 @dataclass
@@ -41,6 +42,8 @@ class DataQaAgent:
         contexts: dict[str, str],
         access_scope: dict[str, Any],
     ) -> DataQaResult:
+        delivery = preferences(query)
+        codes = []
         client = self.mcp_client_factory(access_scope)
         tools = [
             tool for tool in client.list_tools()
@@ -67,14 +70,14 @@ class DataQaAgent:
             derivations+='已有订单与商品金额，可进一步查询单均商品金额；不要称整个数据源缺少客单价。'
         system = (
             "你是数据问答智能体。严格执行下面的Skill，并只返回JSON。\n\n"
-            "业务术语：商品金额不是净收入或利润；每单明细条数不能改称商品件数。所选范围内只有某州时，不得推断其他州是否正常。\n"
+            "业务术语：商品金额不是净收入或利润；item_count、qty_jul、qty_aug 和 items_per_order 统计商品明细条数，avg_item_price 是平均明细价格；不能改称实物件数、每件金额或每单件数。所选范围内只有某州时，不得推断其他州是否正常。\n"
             "事实优先级：后端完整统计和标准指标定义高于历史助手解读；过去助手的因果判断不能当作数据证据。"
             "没有活动、促销或实验字段时，禁止把峰值归因为促销、黑五、营销或运营措施；不得使用受促销拉动、说明订单集中于促销日等措辞。"
             "末尾补充不构成因果的声明不能修正正文的归因。只描述统计变化，原因不明时直说数据不能确定。\n"
             "业务数值规则：所有计数、金额、比率、差值、极值必须使用 fact_catalog 中的 {{fact:id}} 占位符，"
             "禁止自行写业务数字或自行心算，包括州的增加/持平/下降数量。没有相应事实时略去该数值。结构化报告只通过fact_ids选择事实，正文不需要占位符。"
             "日历日期可直接写，例如2018年8月。严禁把不同时间依据的数据当同一口径比较。"
-            "不要在正文输出task_id等内部标识；来源用结果标题描述。只引用目录中逐字存在的fact ID，严禁按行号猜测ID。"
+            "不要在正文输出task_id、订单或商品编号；不要自行缩写编号，请使用该订单、这组商品，必要标识由事实引用展示。来源用结果标题描述。只引用目录中逐字存在的fact ID，严禁按行号猜测ID。"
             "行数、品类数量也必须引用事实。优先级用中文或P标记；报告应简洁，优先解释重要变化。"
             "生成报告时，后端会自动附上数值事实表和变化统计。observations、hypotheses、actions只写定性文字，"
             "不要重复数字表格，不要写品类数量或零值；如需数值仍必须使用事实引用。"
@@ -95,6 +98,7 @@ class DataQaAgent:
         user = json.dumps(
             {
                 "query": query,
+                "delivery_constraints": delivery,
                 "available_data_sources": [{k:v for k,v in source.items() if k not in {"row_count","rows","covered_rows","input_rows","excluded_rows"}} for source in source_catalog.values()],
                 "fact_catalog": {key:{k:value[k] for k in ('label','display','source_task_id','scope')} for key,value in model_facts.items()},
                 "context": {
@@ -105,11 +109,12 @@ class DataQaAgent:
             ensure_ascii=False,
         )
         try:
-            for attempt in range(2):
+            attempts=3 if delivery["compact"] else 2
+            for attempt in range(attempts):
                 payload = self.model_client.chat_json(system, user)
                 if not isinstance(payload,dict): payload={'action':'report','observations':None}
                 try:
-                    payload = self._structured_payload(payload, {**facts,**model_facts})
+                    payload = self._structured_payload(payload, {**facts,**model_facts}, delivery)
                     # Ordinary answers use the same valid F handles as reports.
                     # Map only advertised aliases; never guess an invalid ID.
                     for field_name in ('answer','markdown','title'):
@@ -125,21 +130,30 @@ class DataQaAgent:
                     except ValueError as exc:
                         issue = str(exc)
                 if not issue:
+                    if delivery['report_requested'] and payload.get('action')=='answer' and not payload.get('tool_calls'):
+                        issue='请求要求报告，请返回结构化报告，不能仅返回一句普通回答。'
+                    else:
+                        payload['tool_calls']=merge_charts(query,payload.get('tool_calls') or [],source_catalog)
+                if not issue:
                     result = self._execute(payload, client, source_catalog)
                     if result.report and facts:
                         model_markdown=result.report.markdown
                         lines=model_markdown.splitlines()
                         if lines and lines[0].strip()=='# '+result.report.title:
                             model_markdown='\n'.join(lines[1:]).strip()
-                        result.report.markdown = '## 经营解读与建议\n\n' + model_markdown + '\n\n' + brief
+                        result.report.markdown = '## 经营解读与建议\n\n' + model_markdown
+                        result.report.evidence_markdown = brief
+                        result.report.validation_codes = list(dict.fromkeys(codes))
                         refs = {r['id']:r for r in [*brief_refs,*result.report.fact_references]}
                         result.report.fact_references = list(refs.values())
                     return result
-                if attempt == 0:
-                    user += "\n输出校验失败：" + issue + " 请用结构化报告格式重写。fact_ids只能逐字复制fact_catalog的F编号，不得自己编写。interpretation、hypotheses、actions不写业务数字；不得作经营原因归因。"
+                codes.append(validation_code(issue))
+                if attempt < attempts-1:
+                    user += "\n输出校验失败：" + issue + " 请用结构化报告格式重写。fact_ids只能逐字复制fact_catalog的F编号，不得自己编写。interpretation、hypotheses、actions不写业务数字或订单/商品编号；使用该订单、这组商品代替编号和数量。数据可用性以本次选中结果为边界，目录存在的字段请写本次选中结果尚未查询，不得作经营原因归因。"
             if facts:
                 report = AnalysisReport(title='经营复盘事实报告',
-                    markdown='模型文字未通过数值引用或数据范围校验。以下仅提供后端整理的查询事实，未包含模型经营解读；可重试生成解读。\n\n'+brief,
+                    markdown='模型文字未通过数值引用或数据范围校验，经营解读尚未完成。查询事实保留在可展开的依据附录中；可使用原问题和原来源重试，或人工补充。',
+                    evidence_markdown=brief,validation_codes=list(dict.fromkeys(codes)),
                     fact_references=brief_refs,generation_mode='facts_only',validation_feedback=[self._validation_feedback(issue)])
                 return DataQaResult(action='report',answer='查询事实已整理；模型经营解读尚未通过校验。',report=report)
             raise ValueError("文字解读未通过数值引用或数据范围校验；已完成的查询仍可查看，请重试。原因：" + issue)
@@ -149,29 +163,31 @@ class DataQaAgent:
             raise PipelineStageError("qa_answer", str(exc)) from exc
 
     @staticmethod
-    def _structured_payload(payload, facts):
+    def _structured_payload(payload, facts, delivery=None):
         """Render model-selected evidence on the server; never infer or repair numbers."""
         if 'observations' not in payload:
             return payload  # Compatibility for ordinary answers and archived model fixtures.
+        delivery = delivery or {"observations":8,"actions":8}
         observations = payload['observations']
         if not isinstance(observations, list) or not 1 <= len(observations) <= 8:
             raise ValueError('报告需要包含有事实依据的观察')
         lines = ['### 观察与依据']
-        for observation in observations:
+        for observation in observations[:delivery["observations"]]:
             if not isinstance(observation, dict): raise ValueError('报告观察格式无效')
             text = str(observation.get('interpretation') or '').strip()
             ids = observation.get('fact_ids')
             if not text or len(text) > 1200 or not isinstance(ids, list) or not 1 <= len(ids) <= 20:
-                raise ValueError('每条观察需要定性说明和一至二十条事实引用')
+                raise ValueError('报告观察需填写定性文字，并以 fact_ids 字符串数组提供一至二十条引用')
             if any(not isinstance(fid, str) or fid not in facts for fid in ids):
                 raise ValueError('数值引用不存在，请逐字复制目录中的事实ID')
             lines.append('- ' + text)
-            lines.extend('  - ' + DataQaAgent._evidence_label(facts[fid]) + '：{{fact:' + facts[fid]['id'] + '}}' for fid in dict.fromkeys(ids))
+            evidence=[DataQaAgent._evidence_label(facts[fid]) + '：{{fact:' + facts[fid]['id'] + '}}' for fid in list(dict.fromkeys(ids))[:3 if delivery.get('compact') else 20]]
+            lines[-1] += ' 数值依据：' + '；'.join(evidence)
         for field, heading in [('hypotheses','待验证假设'),('actions','建议核查步骤')]:
             values=payload.get(field,[])
             if not isinstance(values,list) or len(values)>8 or any(not isinstance(t,str) or len(t)>1200 for t in values):
                 raise ValueError('报告建议格式无效')
-            lines.extend(['', '### '+heading, *('- '+t for t in values if t.strip())])
+            lines.extend(['', '### '+heading, *('- '+t for t in values[:delivery['actions']] if t.strip())])
         return {**payload,'action':'report','markdown':'\n'.join(lines)}
 
     @staticmethod
@@ -288,31 +304,19 @@ class DataQaAgent:
     @staticmethod
     def _source_catalog(contexts: dict[str, str]) -> dict[str, dict[str, Any]]:
         catalog: dict[str, dict[str, Any]] = {}
-        for key in ("recent_result", "selected_tables"):
-            raw = contexts.get(key) or ""
-            if not raw:
-                continue
-            try:
-                parsed = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            items = parsed if isinstance(parsed, list) else [parsed]
-            for item in items:
-                if not isinstance(item, dict) or not item.get("task_id"):
-                    continue
-                task_id = str(item["task_id"])
-                catalog[task_id] = {
-                    "task_id": task_id,
-                    "title": str(item.get("title") or "查询结果"),
-                    "query": str(item.get("query") or ""),
-                    "columns": [str(column) for column in item.get("columns") or []],
-                    "row_count": int(item.get("row_count") or len(item.get("rows") or [])),
-                    "coverage": (item.get("result_profile") or {}).get("coverage", "preview_only"),
-                    "row_preview_only": True,
-                }
-                for derived in item.get("summary_sources") or []:
-                    if derived.get("task_id") == task_id+":summary:time" and derived.get("coverage")=="full_result_summary":
-                        catalog[derived["task_id"]] = derived
+        for item in source_items(contexts):
+            task_id = str(item['task_id'])
+            catalog[task_id] = {
+                'task_id': task_id, 'title': str(item.get('title') or '查询结果'),
+                'query': str(item.get('query') or ''),
+                'columns': [str(c) for c in item.get('columns') or []],
+                'row_count': int(item.get('row_count') or len(item.get('rows') or [])),
+                'coverage': (item.get('result_profile') or {}).get('coverage', 'preview_only'),
+                'row_preview_only': True,
+            }
+            for derived in item.get('summary_sources') or []:
+                if derived.get('task_id') == task_id+':summary:time' and derived.get('coverage')=='full_result_summary':
+                    catalog[derived['task_id']] = derived
         return catalog
 
     @staticmethod

@@ -10,6 +10,8 @@ from ..model_client import ModelClient
 from ..models import QueryResult
 from ..telemetry import active_trace
 from ..result_profile import ensure_profile, chart_source
+
+MAX_ANALYSIS_SOURCES = 12
 from ..analysis_basis import actual_basis, basis_for
 from .session_archive import SessionArchive
 from .short_term_memory import ShortTermMemory
@@ -185,7 +187,7 @@ class SessionContext:
             if item.get("task_id")
         }
         headers = []
-        for task_id in list(dict.fromkeys(workspace.get("analysis_table_ids") or []))[:5]:
+        for task_id in list(dict.fromkeys(workspace.get("analysis_table_ids") or [])):
             provided = supplied.get(task_id)
             if provided:
                 headers.append({
@@ -246,8 +248,10 @@ class SessionContext:
 
     def analysis_context(self, session_id: str, workspace: dict[str, Any]):
         payloads=[];sources=[]
+        if len(set(workspace.get("analysis_table_ids") or [])) > MAX_ANALYSIS_SOURCES:
+            raise ValueError(f"最多选择 {MAX_ANALYSIS_SOURCES} 份参考结果，请减少选择后重试")
         # Selected tables have already been authorized by AskDataService. Ignore supplied rows here.
-        ids = list(dict.fromkeys(workspace.get("analysis_table_ids") or []))[:5]
+        ids = list(dict.fromkeys(workspace.get("analysis_table_ids") or []))
         if not ids:
             completed = [task_id for task_id in self.session_tasks.get(session_id, [])
                          if self.tasks[task_id]["result"].route == "database_query"
@@ -295,6 +299,8 @@ class SessionContext:
         resolved = dict(workspace or {})
         resolved["schema_fields"] = list(resolved.get("schema_fields") or resolved.get("fields") or [])
         resolved["analysis_table_ids"] = list(dict.fromkeys(resolved.get("analysis_table_ids") or []))
+        if len(resolved["analysis_table_ids"]) > MAX_ANALYSIS_SOURCES:
+            raise ValueError(f"最多选择 {MAX_ANALYSIS_SOURCES} 份参考结果，请减少选择后重试")
         resolved["analysis_tables"] = list(resolved.get("analysis_tables") or [])
         resolved["confirmed_schema_tables"] = list(dict.fromkeys(resolved.get("confirmed_schema_tables") or []))
         resolved["confirmed_parameters"] = dict(resolved.get("confirmed_parameters") or {})

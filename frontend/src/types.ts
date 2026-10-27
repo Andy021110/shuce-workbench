@@ -138,6 +138,8 @@ export interface AnalysisReport {
   fact_references?: {id:string; source_task_id:string; source_title:string; label:string; display:string; scope:string}[]
   generation_mode?: 'model_with_facts' | 'facts_only' | 'backend_facts'
   validation_feedback?:string[]
+  evidence_markdown?:string
+  validation_codes?:string[]
 }
 
 export interface ReportToolCall {
@@ -238,6 +240,7 @@ export interface QueryResult {
   }
   tool_calls?: CoderToolCall[]
   analysis_sources?: AnalysisSource[]
+  answer_checks?: {question:string;status:string;answer:string}[]
   workflow_mode?: "qa" | "single_database_fast_path" | "multi_database_handoff" | "langgraph_hitl" | string | null
   report?: AnalysisReport | null
   report_tool_calls?: ReportToolCall[]
@@ -258,6 +261,7 @@ export interface ReportDataSource {
 
 export interface WorkspaceConfig {
   continuation_task_id?:string
+  retry_task_id?:string
   database_id?: string
   schema_fields?: ConfirmedField[]
   analysis_table_ids?: string[]

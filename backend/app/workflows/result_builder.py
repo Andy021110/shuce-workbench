@@ -142,6 +142,7 @@ class ResultBuilder:
             tool_calls=tool_calls,
             result_title=final.get("title") or "查询结果",
             analysis_sources=state.get("analysis_sources") or [],
+            answer_checks=final.get("answer_checks") or [],
             standalone_query=state.get("standalone_query"),
             schema_graph=graph,
             workflow_mode=mode,

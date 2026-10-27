@@ -340,7 +340,7 @@ class QueryWorkflow:
         stage("result_analysis")
         try:
             final = self.response_generator.finalize(
-                state["standalone_query"], execution, state["schema_context"],
+                state["query"], execution, state["schema_context"],
                 state.get("analysis_context", ""),
             )
         except PipelineStageError as exc:

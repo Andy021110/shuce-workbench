@@ -21,6 +21,8 @@ LABELS = {'buyers':'买家数','returning_buyers':'本期历史老客数','retur
           'previous_late':'上月超时数','current_late':'本月超时数','new_late_orders':'新增超时数',
           'previous_late_rate':'上月超时率','current_late_rate':'本月超时率','orders_with_items':'有商品明细的订单数','item_rows':'商品明细条数','sales_per_order':'单均商品金额','items_per_order':'每单明细条数','avg_item_price':'平均明细价格'}
 
+LABELS.update({'qty_jul': '7月商品明细条数', 'qty_aug': '8月商品明细条数', 'sales_jul': '7月商品金额', 'sales_aug': '8月商品金额', 'sales_delta': '商品金额增量', 'qty_delta': '商品明细条数变化', 'top5_share_of_total_delta': '前五商品占总增量比重', 'contribution_share': '增量贡献占比', 'delivery_group': '配送分组', 'review_answer_timestamp': '评价回复时间', 'review_creation_date': '评价创建日期', 'order_purchase_timestamp': '下单时间', 'order_estimated_delivery_date': '预计送达日期', 'order_delivered_customer_date': '实际送达时间', 'order_delivered_carrier_date': '交给承运商时间', 'late_days': '超时天数', 'product_id': '商品编号', 'order_id': '订单编号', 'customer_city': '客户城市', 'item_sales_per_order': '单均商品金额', 'review_score': '评价星级', 'review_comment_message': '评价正文', 'review_comment_title': '评价标题', 'reviewed_orders': '有评价订单数', 'low_score_orders': '低星订单数', 'low_score_rate': '低星订单占比', 'avg_price_jul': '7月平均明细价格', 'avg_price_aug': '8月平均明细价格', 'total_delta': '商品金额总增量', 'jul_qty': '7月商品明细条数', 'aug_qty': '8月商品明细条数', 'jul_price': '7月平均明细价格', 'aug_price': '8月平均明细价格'})
+LABELS.update({'avg_item_sales_per_order': '单均商品金额', 'late_orders': '超时订单数', 'item_count': '商品明细条数', 'unreviewed_orders': '未评价订单数', 'low_star_orders': '低星订单数', 'low_star_rate': '低星订单占比', 'min_review_score': '最低评价星级', 'hb_item_sales': '健康美容商品金额'})
 
 def small_integer(text):
     if text.isdigit():
@@ -104,6 +106,8 @@ def source_items(contexts):
         for item in parsed if isinstance(parsed, list) else [parsed]:
             if isinstance(item, dict) and item.get("task_id"):
                 sources[str(item["task_id"])] = item
+        if sources:
+            break  # An explicit selection excludes unrelated recent results.
     return list(sources.values())
 
 
@@ -111,7 +115,7 @@ def formatted(value, field=""):
     value = Decimal(str(value))
     if field == "items_per_order":
         return f"{value:.4f}"
-    if re.search(r"rate|ratio|percent|率|占比", field, re.I):
+    if field in {"top5_share_of_total_delta","contribution_share"} or re.search(r"rate|ratio|percent|率|占比", field, re.I):
         return f"{value * 100:.2f}%"
     if re.search(r"sales|price|payment|amount|金额|销售额", field, re.I):
         return f"{value:,.2f}"
@@ -120,7 +124,10 @@ def formatted(value, field=""):
 
 def build_facts(contexts):
     facts = {}
-    for index, item in enumerate(source_items(contexts)):
+    items = source_items(contexts)
+    source_limit = max(1, 600 // max(1, len(items)))
+    for index, item in enumerate(items):
+        start_count = len(facts)
         profile = item.get("result_profile") or {}
         columns = item.get("columns") or []
         rows = item.get("rows") or []
@@ -128,7 +135,7 @@ def build_facts(contexts):
         prefix = f"s{index}"
 
         def add(key, label, value, field="", scope="完整 SQL 结果", display=None):
-            if value is None or len(facts) >= 600:
+            if value is None or len(facts) - start_count >= source_limit:
                 return
             fact_id = prefix + "_" + key
             facts[fact_id] = {"id": fact_id, "source_task_id": item["task_id"],
@@ -162,6 +169,9 @@ def build_facts(contexts):
                 if numeric(row.get(field)):
                     add(f"r{r}_c{c}", f"{identity or '结果行'} · {field}", row[field], field,
                         scope=f"结果第 {r+1} 行")
+                elif isinstance(row.get(field), str) and (field in {'order_id','product_id','seller_id','delivery_group','period','month','customer_city','customer_state'} or re.search(r'_date$|_timestamp$|_at$',field)):
+                    add(f"r{r}_c{c}", f"{identity or '结果行'} · {field}", row[field], field,
+                        scope=f"结果第 {r+1} 行", display=row[field][:200])
         for t, comparison in enumerate((item.get('review_context') or {}).get('target_comparison') or []):
             field = comparison['metric']
             for key in ('actual','target','gap','achievement_rate'):
@@ -211,7 +221,8 @@ def validate_and_render(payload, facts, schema_catalog):
         without_refs = re.sub(r"(?m)^\s*\d+[.)、]\s*|(?<![A-Za-z])P[0-3](?!\d)|\bv\d+\.\d+\b", "", without_refs)
         # A top-N selection describes how to inspect rows, not the population size.
         # '共有十个州下降' remains a measured claim and must cite a fact.
-        without_refs = re.sub(r"(?:排名前|降幅前|涨幅前|下降最多的|上升最多的|前)[零一二三四五六七八九十百两\d]+个(?:品类|州|地区|渠道)", "", without_refs)
+        without_refs = re.sub(r"(?:排名前|降幅前|涨幅前|下降最多的|上升最多的|前)[零一二三四五六七八九十百两\d]+个(?:品类|州|地区|渠道|商品|商家|城市)", "", without_refs)
+        without_refs = re.sub(r"(?i)(?<![A-Za-z0-9_])top\s*\d{1,2}(?!\d)", "", without_refs)
         enumeration=r"([A-Z]{2}(?:\s*[、与和及]\s*[A-Z]{2})+)\s*([零一二三四五六七八九十两\d]+)个州"
         for match in list(re.finditer(enumeration,without_refs)):
             states=set(re.findall(r'[A-Z]{2}',match[1]))
@@ -226,11 +237,26 @@ def validate_and_render(payload, facts, schema_catalog):
         for match in list(re.finditer(r'([A-Za-z_]+)(?:一|1)个品类',without_refs)):
             if facts and all(f.get('filters',{}).get('categories')==[match[1]] for f in facts.values()):
                 without_refs=without_refs.replace(match[0],match[1])
+        # Verify deictic selection counts against the one complete selected product
+        # table. Never exempt an arbitrary population or growth count.
+        product_owners={f['source_task_id'] for f in facts.values() if f.get('field')=='product_id'}
+        if len(product_owners)==1:
+            owner=next(iter(product_owners))
+            product_values={f['value'] for f in facts.values() if f.get('field')=='product_id' and f['source_task_id']==owner}
+            count_fact=next((f for f in facts.values() if f['source_task_id']==owner and f['id'].endswith('_rows') and Decimal(f['value'])==len(product_values)),None)
+            for match in list(re.finditer(r'(?:这|所选|选中的)([零一二三四五六七八九十两\d]+)个商品',without_refs)):
+                if count_fact and small_integer(match[1])==len(product_values):
+                    without_refs=without_refs.replace(match[0],'所选商品')
+                    if count_fact['id'] not in refs:refs.append(count_fact['id'])
+        owner_count=len({f['source_task_id'] for f in facts.values()})
+        for match in list(re.finditer(r'(?:基于|综合|所选|选中的)([零一二三四五六七八九十两\d]+)份(?:结果|来源|查询)',without_refs)):
+            if small_integer(match[1])==owner_count:
+                without_refs=without_refs.replace(match[0],'所选查询来源')
         # Product identifiers such as home_appliances_2 are labels, not measurements.
         for label in re.findall(r"[A-Za-z][A-Za-z_]+\d+[A-Za-z_0-9]*", without_refs):
             if any(label in fact['label'] for fact in facts.values()):
                 without_refs = without_refs.replace(label, '')
-        unmatched = re.search(r"\d+(?:\.\d+)?|[零一二三四五六七八九十百千万两]+(?:个州|个品类|笔订单|单订单|元|个百分点)", without_refs)
+        unmatched = re.search(r"\d+(?:\.\d+)?|[零一二三四五六七八九十百千万两]+(?:个州|个品类|个商品|个商家|个城市|笔订单|单订单|元|个百分点)", without_refs)
         if unmatched:
             snippet = without_refs[max(0,unmatched.start()-20):unmatched.end()+20]
             raise ValueError(f"正文存在未引用的业务数值（{snippet}）；所有计数、金额、比率、差值必须使用 {{{{fact:id}}}}，不允许自行填写或计算。")
@@ -257,7 +283,7 @@ def validate_and_render(payload, facts, schema_catalog):
             raise ValueError('统计计数为零不能被解释为数据缺失；缺失值与零值必须区分。')
         if not re.search(r"没有|缺少|缺失|不包含|未提供", sentence):
             continue
-        if re.search(r"当前结果|本次结果|结果表|本轮结果|尚未查询|未查询", sentence):
+        if re.search(r"当前结果|本次结果|结果表|本轮结果|(?:所选|选中|已选)(?:的)?结果|现有结果|尚未查询|未查询", sentence):
             continue
         negative_spans = re.findall(r"(?:没有|缺少|缺失|不包含|未提供)([^。；，,\n]{0,100})", sentence)
         for alias, column in aliases.items():

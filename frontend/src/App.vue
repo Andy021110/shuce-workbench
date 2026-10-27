@@ -151,9 +151,14 @@ const reportDataSources = computed<ReportDataSource[]>(() => {
   }
   return [...sources.values()]
 })
+const currentResultTables = computed<HistoricalResultTable[]>(()=> (activeConversation.value?.turns || [])
+  .filter(turn=>turn.result.route==='database_query' && turn.result.status==='completed' && turn.result.columns.length)
+  .map(turn=>({taskId:turn.result.task_id,title:turn.result.result_title || '查询结果',query:turn.query,
+    columns:turn.result.columns,rows:turn.result.rows,rowCount:turn.result.total_rows ?? turn.result.rows.length})))
+const availableResultTables = computed(()=>[...new Map([...historicalResultTables.value,...currentResultTables.value].map(table=>[table.taskId,table])).values()])
 const selectedAnalysisTables = computed(() =>
   analysisTableIds.value
-    .map((id) => historicalResultTables.value.find((table) => table.taskId === id))
+    .map((id) => availableResultTables.value.find((table) => table.taskId === id))
     .filter((table): table is HistoricalResultTable => Boolean(table)),
 )
 const recentFields = computed(() => {
@@ -500,7 +505,7 @@ function retryTurn(turn: ConversationTurn){
   if(turn.result.review_context) {submitReview(turn.result.review_context.month,turn.result.review_context.step,true,turn.result.review_context.targets,turn.result.review_context.filters);return}
   const definition=turn.result.metric_contracts?.[0]
   if(turn.result.metric_basis==='canonical' && definition?.parameters) submitMetric({metric_id:definition.id,...definition.parameters},true)
-  else submit(turn.query)
+  else submit(turn.query,turn.result.route==='data_qa' ? {retry_task_id:turn.result.task_id,analysis_table_ids:turn.result.analysis_sources?.map(source=>source.task_id) || []} : {})
 }
 
 async function saveResult(result: QueryResult) {
@@ -540,11 +545,17 @@ function dragAnalysisTable(event: DragEvent, table: HistoricalResultTable) {
 }
 
 function addAnalysisTable(taskId: string) {
-  if (!historicalResultTables.value.some((table) => table.taskId === taskId) || analysisTableIds.value.includes(taskId)) return
+  if (!availableResultTables.value.some((table) => table.taskId === taskId) || analysisTableIds.value.includes(taskId)) return
+  if (analysisTableIds.value.length >= 12) {error.value="最多选择 12 份参考结果，请先移除部分来源。";return}
   workspace.value.analysis_table_ids = [...analysisTableIds.value, taskId]
   saveActiveConversation()
 }
 
+function selectCurrentResults(){
+  const ids=[...new Set([...analysisTableIds.value,...currentResultTables.value.map(table=>table.taskId)])]
+  if(ids.length>12){error.value='本次结果超过 12 份，请逐份选择需要的来源。';return}
+  workspace.value.analysis_table_ids=ids;rightOpen.value=true;saveActiveConversation()
+}
 function dropAnalysisTable(event: DragEvent) {
   addAnalysisTable(event.dataTransfer?.getData("analysis-result-table") ?? "")
 }
@@ -798,6 +809,7 @@ function clarificationHint(result: QueryResult) {
                   </div>
                 </details>
 
+                <section v-if="turn.result.answer_checks?.length" class="answer-checks" aria-label="业务判断回应"><h3>原问题里的业务判断</h3><div v-for="check in turn.result.answer_checks" :key="check.question"><strong>{{check.question}}</strong><p>{{check.answer}}</p><small>{{check.status==='not_answered' ? '判断待补充' : check.status==='insufficient_evidence' ? '证据边界已说明' : '已回应，请结合依据核对'}}</small></div></section>
                 <AnalysisScope v-if="turn.result.analysis_scope" :scope="turn.result.analysis_scope" />
                 <div v-if="turn.result.analysis_basis" class="basis-notice">
                   <strong>{{ turn.result.analysis_basis.verified ? '统计时间：'+turn.result.analysis_basis.time_label : '此查询未检测到按日期筛选或分组' }}</strong>
@@ -811,6 +823,9 @@ function clarificationHint(result: QueryResult) {
                 <div v-if="turn.result.route === 'data_qa' && turn.result.status==='failed'" class="natural-clarification">
                   <strong>解读未完成</strong><p>暂未生成完整解读。已完成的查询仍然保留，可重试，或整理事实并人工补充。</p>
                   <button :disabled="loading || !!activeJob" @click="retryTurn(turn)">重试解读</button> <button :disabled="loading || !!activeJob" @click="createFactReport">整理事实并人工补充</button>
+                </div>
+                <div v-if="turn.result.report?.generation_mode==='facts_only'" class="natural-clarification">
+                  <button :disabled="loading || !!activeJob" @click="retryTurn(turn)">用原问题和原来源重试解读</button><small>绑定原问题与当时选取的来源；实际采用的依据会在新结果中列出。</small>
                 </div>
                 <ReportCard
                   v-if="turn.result.report"
@@ -836,6 +851,7 @@ function clarificationHint(result: QueryResult) {
                 >
                   <template #actions>
                       <button v-if="turn.result.sql" @click="expandedSql = expandedSql === turn.result.task_id ? null : turn.result.task_id">SQL</button>
+                      <button :disabled="loading || !!activeJob" @click="analysisTableIds.includes(turn.result.task_id) ? removeAnalysisTable(turn.result.task_id) : addAnalysisTable(turn.result.task_id)">{{analysisTableIds.includes(turn.result.task_id) ? '移出报告来源' : '用于报告'}}</button>
                       <button class="save-result" :disabled="turn.result.saved" @click="saveResult(turn.result)">{{ turn.result.saved ? "已保存" : "保存" }}</button>
                   </template>
                   <template #details>
@@ -894,6 +910,7 @@ function clarificationHint(result: QueryResult) {
         <button v-if="activeConversation?.turns.length" type="button" class="reading-toggle" :aria-expanded="!readingMode" @click="toggleReading">{{ readingMode ? '退出阅读，继续提问' : '收起输入区，专注阅读' }}</button>
         <div v-if="!readingMode && activeJob && !loading" class="detached-job">页面已停止等待，后台任务未取消 <button @click="resumeJob(activeJob)">恢复查看</button></div>
         <div v-show="!readingMode" class="composer-box">
+          <div v-if="selectedAnalysisTables.length" class="composer-sources" role="status">已选 {{selectedAnalysisTables.length}} / 12 份报告来源 · 将逐份采用 <button @click="rightOpen=true">核对来源</button></div>
           <textarea v-model="input" rows="2" maxlength="500" :aria-label="`向${product.name}提问`" :placeholder="isOlist ? '输入指标、时间与维度，例如：统计 2017 年每月去重订单数' : currentDatabase === 'short_video_ops' ? '输入指标、时间与维度，例如：统计 2026 年 8 月各渠道新增用户数' : '输入字段、条件与统计口径，开始分析本地 CSV'" @keydown="onComposerKey"></textarea>
           <div class="composer-meta">
             <span>问数 {{ confirmedFields.length }} 个字段 · 分析 {{ selectedAnalysisTables.length }} 张结果表 · {{ input.length }}/500</span>
@@ -938,7 +955,7 @@ function clarificationHint(result: QueryResult) {
       <section class="context-block analysis-context-block">
         <div class="context-heading">
           <div><strong>参考结果</strong><small>用于综合分析</small></div>
-          <em>{{ selectedAnalysisTables.length }} 张</em>
+          <em>{{ selectedAnalysisTables.length }} / 12 份</em>
         </div>
         <div
           class="analysis-tables-zone"
@@ -948,7 +965,7 @@ function clarificationHint(result: QueryResult) {
         >
           <div v-if="!selectedAnalysisTables.length" class="empty-confirmation">
             <span>＋</span>
-            <strong>添加已保存的查询结果</strong>
+            <strong>直接选择本次结果，也可添加已收藏结果</strong>
           </div>
           <div v-for="table in selectedAnalysisTables" :key="table.taskId" class="analysis-table-chip">
             <span class="table-mark">▦</span>
@@ -958,6 +975,10 @@ function clarificationHint(result: QueryResult) {
         </div>
       </section>
 
+      <section v-if="currentResultTables.length" class="context-block" aria-label="本次分析结果选择">
+        <div class="context-heading"><strong>本次分析结果 · 无需先保存</strong><button :disabled="loading || !!activeJob" @click="selectCurrentResults">全部选择</button></div>
+        <label v-for="table in currentResultTables" :key="table.taskId" class="current-result-option"><input type="checkbox" :checked="analysisTableIds.includes(table.taskId)" :aria-label="`用于报告：${table.title}`" @change="analysisTableIds.includes(table.taskId) ? removeAnalysisTable(table.taskId) : addAnalysisTable(table.taskId)"><span>{{table.title}} · {{table.rowCount}} 行</span></label>
+      </section>
       <section class="recent-library">
         <div class="library-heading">
           <div><strong>字段与结果</strong><small>点击添加，也可拖拽</small></div>
@@ -1004,4 +1025,8 @@ function clarificationHint(result: QueryResult) {
 </template>
 <style scoped>
 .continuation-confirm{margin-top:16px;padding:16px;border:1px solid #b4c9bc;border-radius:10px;background:#f4f9f6;color:#294c39;line-height:1.7}.continuation-confirm summary{min-height:44px;align-content:center;cursor:pointer}.continuation-confirm button{min-height:44px;margin-top:8px;padding:8px 16px;border:1px solid #246b4e;border-radius:8px;background:#246b4e;color:#fff}.continuation-confirm :is(button,summary):focus-visible{outline:3px solid #5a9279;outline-offset:3px}
+</style>
+
+<style scoped>
+.current-result-option{display:flex;gap:10px;align-items:center;min-height:44px;font-size:13px;padding:8px 0;overflow-wrap:anywhere}.current-result-option input{width:18px;height:18px;flex:none}.composer-sources{font-size:12px;color:#345a48;padding:8px 4px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}.composer-sources button{min-height:36px;color:#24563e}.answer-checks{border:1px solid #cad8cf;border-radius:8px;padding:14px;margin:14px 0;line-height:1.8}.answer-checks h3{font-size:14px}.answer-checks strong{font-size:13px}.answer-checks p{font-size:14px;margin:8px 0}.answer-checks small{color:#52685e}.answer-checks>div+div{border-top:1px solid #dce3de;margin-top:12px;padding-top:12px}
 </style>

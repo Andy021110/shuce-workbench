@@ -58,6 +58,15 @@ class AskDataService:
         access_scope = self.access_controller.select_database(access_scope, database_id)
         # 数据源也是会话边界，切换后不能继承另一数据库的待澄清任务或历史结果。
         scoped_session_id = f"{access_scope.user_id}:{session_id}" + (f":{database_id}" if database_id else "")
+        retry_id=(workspace or {}).get('retry_task_id')
+        if retry_id:
+            original=self.tasks.get(retry_id)
+            if not original or original.get('user_id')!=access_scope.user_id or (original.get('workspace') or {}).get('database_id')!=database_id:
+                raise PermissionError('无权重试该报告')
+            if original['result'].route!='data_qa' or original['query'].strip()!=normalized:
+                raise ValueError('重试须使用原报告问题；修改问题请作为新任务提交')
+            original_ids=(original.get('workspace') or {}).get('analysis_table_ids') or [source['task_id'] for source in original['result'].analysis_sources]
+            workspace={**(workspace or {}),'analysis_table_ids':list(original_ids)}
         pending = self.context.latest_pending(scoped_session_id)
         if pending and pending.get("user_id") == access_scope.user_id:
             option_id = self.context.match_clarification(normalized, pending["result"])
@@ -88,6 +97,7 @@ class AskDataService:
             if (selected.get("workspace") or {}).get("database_id") != database_id:
                 raise PermissionError("不能跨数据源引用历史查询结果")
             result_table = selected["result"]
+            if result_table.route != 'database_query':raise ValueError('参考来源必须是已完成的查询结果')
             if result_table.status!='completed':raise ValueError('该历史结果未通过核对或尚未完成，请重新查询后引用')
             ensure_profile(result_table)
             supplied.append({"task_id": selected_id, "title": result_table.result_title,
@@ -436,7 +446,7 @@ class AskDataService:
             "access_scope": access_scope or self.access_controller.resolve(None).public(),
             "route_context": self.context.route_context(session_id, workspace),
             "short_term_context": self.context.short_term_context(session_id),
-            "recent_result_context": self.context.recent_result_context(session_id),
+            "recent_result_context": "" if analysis_sources else self.context.recent_result_context(session_id),
             "analysis_context": analysis_context,
             "analysis_sources": analysis_sources,
             "schema_catalog": catalog,
