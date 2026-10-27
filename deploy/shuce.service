@@ -1,0 +1,27 @@
+[Unit]
+Description=Shuce business analytics workbench
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=shuce
+Group=shuce
+WorkingDirectory=/opt/shuce/current/backend
+EnvironmentFile=/etc/shuce/app.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/shuce/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8020 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/shuce
+MemoryMax=650M
+CPUQuota=100%
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

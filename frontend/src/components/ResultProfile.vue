@@ -1,0 +1,25 @@
+<script setup lang="ts">
+import type { ResultProfile, MetricContract } from "../types"
+defineProps<{profile?: ResultProfile | null; contracts?: MetricContract[]; basis?: string | null}>()
+function format(value: unknown){if(value==null)return '—';const n=Number(value);return Number.isFinite(n)&&Math.abs(n)<1e15 ? new Intl.NumberFormat('zh-CN',{maximumFractionDigits:6}).format(n):String(value)}
+function context(rows:Record<string,unknown>[]){return rows.map(row=>Object.entries(row).map(([k,v])=>`${k}: ${v}`).join(' / ')).join('；')}
+</script>
+<template>
+<div class="result-evidence">
+  <details v-if="profile" class="complete-statistics" :open="profile.analyzed_rows>200">
+    <summary>{{ profile.coverage==='full_result' ? '完整结果统计' : '预览统计，完整快照不可用' }} <span>{{ profile.analyzed_rows }} / {{ profile.row_count ?? '未知' }} 行</span></summary>
+    <p>{{ profile.scope_note }} 此处基于固定 SQL 结果，表格中的临时筛选不会改变统计范围。</p>
+    <div v-if="profile.metric_totals" class="metric-totals"><strong>期间整体指标 · 标准口径</strong><dl><template v-for="(value,key) in profile.metric_totals.values" :key="key"><dt>{{ key }}</dt><dd>{{ String(key).endsWith('_rate') && value!=null ? format(Number(value)*100)+'%' : format(value) }}</dd></template></dl><p>{{ profile.metric_totals.note }}</p></div>
+    <div v-if="profile.numeric.length" class="profile-scroll"><table><thead><tr><th>结果列</th><th>有效 / 缺失</th><th>列总和</th><th>行平均值</th><th>最小值</th><th>最大值</th></tr></thead><tbody><tr v-for="item in profile.numeric" :key="item.field"><th>{{ item.field }}</th><td>{{ item.count }} / {{ item.missing }}</td><td>{{ format(item.sum) }}</td><td>{{ format(item.mean) }}</td><td>{{ format(item.min) }}</td><td>{{ format(item.max) }}</td></tr></tbody></table></div>
+    <p v-else>没有可统计的数值列。</p><p>{{ profile.aggregation_note }}</p>
+    <details v-for="item in profile.numeric" :key="item.field" class="extrema-detail"><summary>{{ item.field }} 的极值所在行</summary><p>最小值：{{ context(item.min_rows) }}</p><p>最大值：{{ context(item.max_rows) }}</p><small>相同极值最多展示 3 行。</small></details>
+    <details v-if="profile.temporal" class="period-detail"><summary>{{ profile.temporal.grain==='month'?'按月':'按年' }}汇总 · {{ profile.temporal.buckets.length }} 期 · 覆盖 {{ profile.temporal.covered_rows }} 行</summary><p>{{ profile.temporal.note }}</p><div class="profile-scroll"><table><thead><tr><th>期间</th><th>结果行数</th><template v-for="column in profile.temporal.measure_columns" :key="column"><th>{{ column }}</th><th>相邻期间变化率</th></template></tr></thead><tbody><tr v-for="row in profile.temporal.buckets" :key="String(row.period)"><th>{{ row.period }}</th><td>{{ row.result_rows }}</td><template v-for="column in profile.temporal.measure_columns" :key="column"><td>{{ format(row[column]) }}</td><td>{{ row[column+'_change_rate']==null ? '—' : format(Number(row[column+'_change_rate'])*100)+'%' }}</td></template></tr></tbody></table></div></details>
+    <p v-if="profile.omitted_columns.length">还有 {{ profile.omitted_columns.length }} 列未生成摘要；当前最多分析前 16 列。</p>
+  </details>
+  <details v-if="contracts?.length" class="contract-evidence"><summary>{{ basis==='canonical' ? '已执行标准指标口径' : '相关指标口径参考，需核对 SQL' }}</summary><p v-if="basis!=='canonical'">这条 SQL 由自然语言生成。以下是相关标准定义，尚未证明 SQL 与标准完全一致；自定义状态或时间范围可能改变口径。</p><section v-for="item in contracts" :key="item.id"><h4>{{ item.label }} · v{{ item.version }}</h4><p>{{ item.definition }}</p><p>时间：{{ item.time_field }}；粒度：{{ item.grain }}；{{ item.currency ? '金额 '+item.currency : '非金额指标' }}</p><p v-if="item.parameters">执行范围：{{ item.parameters.start_date || '历史起始' }} 至 {{ item.parameters.end_date || '历史结束' }}；{{ item.parameters.grain }}</p></section></details>
+</div>
+</template>
+<style scoped>
+.metric-totals{padding:12px;background:#e5f1e9;border-radius:6px;margin:12px 0}.metric-totals>strong{font-size:13px}.metric-totals dl{display:grid;grid-template-columns:minmax(100px,1fr) minmax(0,1fr);gap:7px;font-size:13px}.metric-totals dd{margin:0;font-weight:650;font-variant-numeric:tabular-nums}
+.result-evidence{border-bottom:1px solid #dce5df;background:#f5f9f6;padding:4px 16px;color:#294c39}.result-evidence>details{padding:12px 0;border-bottom:1px solid #dce5df}.result-evidence>details:last-child{border-bottom:0}.result-evidence summary{cursor:pointer;font-size:13px;font-weight:600;min-height:28px;line-height:1.8}.complete-statistics>summary span{font-weight:400;color:#52685e;margin-left:10px}.result-evidence p,.result-evidence small{font-size:12px;line-height:1.8;color:#52685e;margin:8px 0;overflow-wrap:anywhere}.profile-scroll{overflow:auto;max-height:340px;margin:10px 0}.profile-scroll table{width:100%;border-collapse:collapse;font-size:12px;background:#fff}.profile-scroll th,.profile-scroll td{padding:9px 10px;border:1px solid #dce5df;text-align:left;white-space:nowrap}.profile-scroll th{background:#edf4ef;font-weight:550}.extrema-detail,.period-detail{margin-top:10px}.contract-evidence h4{font-size:13px;margin:14px 0 5px}.contract-evidence section{padding:0 0 6px}@media(max-width:720px){.result-evidence{padding:4px 12px}.complete-statistics>summary span{display:block;margin-left:0}.result-evidence summary{min-height:36px}}
+</style>

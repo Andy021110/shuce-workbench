@@ -1,0 +1,18 @@
+{
+  "basis": "AskData Studio v2.1.1 用户提供代码包",
+  "archive_sha256": "1bf46cbdc9ee7f30af780f95e1946053a3be3fb9f9ce45963ed9f35f5b8040ef",
+  "publication": "数策经营分析工作台：业务流程、数据口径、恢复与调用可见性迭代",
+  "original_license_file_found": false,
+  "license_added": false,
+  "excluded": [
+    "私有环境配置",
+    "登录令牌",
+    "会话数据库",
+    "保存的记忆",
+    "导入的私人CSV",
+    "模型原始消息",
+    "生成的向量索引",
+    "Olist完整原始数据",
+    "供应商实时账单"
+  ]
+}

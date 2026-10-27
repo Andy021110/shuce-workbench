@@ -1,0 +1,2 @@
+PRODUCT_NAME = '数策'
+PRODUCT_TITLE = f'{PRODUCT_NAME} · 经营分析工作台'

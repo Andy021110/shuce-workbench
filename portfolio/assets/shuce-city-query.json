@@ -1,0 +1,66 @@
+{
+  "recorded_at": "2026-10-27",
+  "evidence_type": "historical_real_execution",
+  "question": "我是RJ地区运营，想决定8月优先跟进哪些城市。请统计2018年8月下单、RJ州健康美容品类的已送达订单，按客户城市列出去重订单数、商品金额（仅健康美容商品、不含运费）及每单商品金额，按商品金额降序取前5个城市。订单数不要因商品明细重复计算。",
+  "sql": "WITH __ask_scope_products AS (SELECT p.product_id FROM olist_products_dataset AS p LEFT JOIN product_category_name_translation AS t USING (product_category_name) WHERE COALESCE(t.product_category_name_english, p.product_category_name, '未分类') IN ('health_beauty')), __ask_scope_orders AS (SELECT scope_o.\"order_id\", scope_o.\"customer_id\", scope_o.\"order_status\", scope_o.\"order_purchase_timestamp\", scope_o.\"order_approved_at\", scope_o.\"order_delivered_carrier_date\", scope_o.\"order_delivered_customer_date\", scope_o.\"order_estimated_delivery_date\" FROM olist_orders_dataset AS scope_o WHERE scope_o.order_status IN ('delivered') AND scope_o.customer_id IN (SELECT customer_id FROM olist_customers_dataset WHERE customer_state IN ('RJ')) AND STRFTIME(scope_o.order_purchase_timestamp, '%Y-%m') IN ('2018-08') AND scope_o.order_id IN (SELECT scope_i.order_id FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)))), __ask_scope_items AS (SELECT scope_i.\"order_id\", scope_i.\"order_item_id\", scope_i.\"product_id\", scope_i.\"seller_id\", scope_i.\"shipping_limit_date\", scope_i.\"price\", scope_i.\"freight_value\" FROM olist_order_items_dataset AS scope_i WHERE (scope_i.product_id IN (SELECT product_id FROM __ask_scope_products)) AND scope_i.order_id IN (SELECT order_id FROM __ask_scope_orders)), __ask_scope_olist_customers_dataset AS (SELECT scope_row.\"customer_id\", scope_row.\"customer_unique_id\", scope_row.\"customer_zip_code_prefix\", scope_row.\"customer_city\", scope_row.\"customer_state\" FROM olist_customers_dataset AS scope_row WHERE scope_row.customer_id IN (SELECT customer_id FROM __ask_scope_orders)), __ask_scope_olist_products_dataset AS (SELECT scope_row.\"product_id\", scope_row.\"product_category_name\", scope_row.\"product_name_lenght\", scope_row.\"product_description_lenght\", scope_row.\"product_photos_qty\", scope_row.\"product_weight_g\", scope_row.\"product_length_cm\", scope_row.\"product_height_cm\", scope_row.\"product_width_cm\" FROM olist_products_dataset AS scope_row WHERE scope_row.product_id IN (SELECT product_id FROM __ask_scope_items)), __ask_scope_product_category_name_translation AS (SELECT scope_row.\"product_category_name\", scope_row.\"product_category_name_english\" FROM product_category_name_translation AS scope_row WHERE scope_row.product_category_name IN (SELECT product_category_name FROM olist_products_dataset WHERE product_id IN (SELECT product_id FROM __ask_scope_items))), cat_orders AS (SELECT oi.order_id, SUM(oi.price) AS item_sales FROM __ask_scope_items AS oi JOIN __ask_scope_olist_products_dataset AS p ON oi.product_id = p.product_id JOIN __ask_scope_product_category_name_translation AS t ON p.product_category_name = t.product_category_name WHERE t.product_category_name_english = 'health_beauty' GROUP BY oi.order_id) SELECT c.customer_city, COUNT(DISTINCT o.order_id) AS order_count, ROUND(SUM(co.item_sales), 2) AS item_sales, ROUND(SUM(co.item_sales) / NULLIF(COUNT(DISTINCT o.order_id), 0), 2) AS sales_per_order FROM __ask_scope_orders AS o JOIN __ask_scope_olist_customers_dataset AS c ON o.customer_id = c.customer_id JOIN cat_orders AS co ON o.order_id = co.order_id WHERE o.order_purchase_timestamp >= CAST('2018-08-01 00:00:00' AS TIMESTAMP) AND o.order_purchase_timestamp < CAST('2018-09-01 00:00:00' AS TIMESTAMP) AND o.order_status = 'delivered' AND c.customer_state = 'RJ' GROUP BY c.customer_city ORDER BY item_sales DESC, c.customer_city ASC LIMIT 5",
+  "columns": [
+    "customer_city",
+    "order_count",
+    "item_sales",
+    "sales_per_order"
+  ],
+  "rows": [
+    {
+      "customer_city": "rio de janeiro",
+      "order_count": 44,
+      "item_sales": 9234.59,
+      "sales_per_order": 209.88
+    },
+    {
+      "customer_city": "sao goncalo",
+      "order_count": 2,
+      "item_sales": 1013.0,
+      "sales_per_order": 506.5
+    },
+    {
+      "customer_city": "sao joao de meriti",
+      "order_count": 1,
+      "item_sales": 527.9,
+      "sales_per_order": 527.9
+    },
+    {
+      "customer_city": "macae",
+      "order_count": 2,
+      "item_sales": 485.0,
+      "sales_per_order": 242.5
+    },
+    {
+      "customer_city": "teresopolis",
+      "order_count": 2,
+      "item_sales": 348.08,
+      "sales_per_order": 174.04
+    }
+  ],
+  "summary": {
+    "workflow_mode": "single_database_agent",
+    "model_requests": 6,
+    "capabilities": {
+      "chat": 4,
+      "embedding": 1,
+      "rerank": 1
+    },
+    "model_failures": 0,
+    "network_retries": 0,
+    "tool_calls": 1,
+    "duration_ms": 11939,
+    "chat_input_tokens": 62852,
+    "chat_output_tokens": 1634,
+    "independent_sql_matches": true
+  },
+  "boundaries": [
+    "公开匿名历史样本，2018年8月，金额BRL",
+    "这是已执行记录的只读回放，不发起新的模型调用",
+    "5行独立SQL核对一致不代表任意自然语言查询正确",
+    "Token为供应商返回用量，非账单金额"
+  ]
+}
