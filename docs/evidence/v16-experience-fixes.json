@@ -1,7 +1,13 @@
 {
   "recorded_at": "2026-10-28",
   "scope": "Agent role simulation on public Olist historical data",
-  "source_revision": "9bac2e499bc317f73ea6a655894f4033a48cb519",
+  "source_revision": "a5ff199edff4fa008ba316a79b13eb0c4df503be",
+  "initial_v16_revision": "9bac2e499bc317f73ea6a655894f4033a48cb519",
+  "failure_recovery_regressions": {
+    "automatic_sources_survive_provider_failure": true,
+    "different_retry_origins_do_not_share_running_job": true,
+    "model_requests": 0
+  },
   "online_report": {
     "status": "passed",
     "product": "http://47.76.25.13/shuce/",
@@ -71,7 +77,7 @@
       ]
     }
   ],
-  "backend_tests": 203,
+  "backend_tests": 205,
   "frontend_tests": 19,
   "no_external_user_research": true
 }
