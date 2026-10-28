@@ -130,6 +130,7 @@ class AskDataService:
                 steps=[f"{exc.stage}失败，流程已停止"],
                 execution_log=[{"stage": exc.stage, "success": False, "error": exc.message}],
                 workflow_mode="failed_explicitly",
+                analysis_sources=request_payload.get("analysis_sources") or [],
             )
             if exc.stage=='scope_inheritance':
                 previous=self.context.latest_table_result(scoped_session_id)

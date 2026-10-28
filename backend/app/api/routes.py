@@ -406,7 +406,7 @@ def start_job(payload: QueryRequest, user: AuthUser = Depends(require_user)):
             period=contract["parameters"]
             query_text=f"{contract['label']} · 标准口径 v{contract['version']} · {period['start_date'] or '历史起始'} 至 {period['end_date'] or '历史结束'} · {period['grain']}"
         except ValueError as error: raise HTTPException(400,str(error))
-    request_key = json.dumps([query_text, payload.review_targets.model_dump(mode="json",exclude_none=True) if payload.review_targets else None,payload.review_filters.model_dump() if payload.review_filters else None,{key:workspace.get(key) for key in ('continuation_task_id','schema_fields','analysis_table_ids')}],sort_keys=True)
+    request_key = json.dumps([query_text, payload.review_targets.model_dump(mode="json",exclude_none=True) if payload.review_targets else None,payload.review_filters.model_dump() if payload.review_filters else None,{key:workspace.get(key) for key in ('continuation_task_id','retry_task_id','schema_fields','analysis_table_ids')}],sort_keys=True)
     with JOBS_LOCK:
         existing = next((j for j in JOBS.values() if j["user_id"] == user.user_id and j["session_id"] == payload.session_id and j.get("database_id") == workspace.get("database_id") and j["status"] == "running"), None)
         if existing:

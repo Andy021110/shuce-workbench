@@ -154,3 +154,33 @@ class RetryBindingTests(unittest.TestCase):
             for user,db,question,error in [('demo_growth_ops','short_video_ops','原报告问题',PermissionError),('demo_admin','short_video_ops','原报告问题',PermissionError),('demo_admin','olist_ecommerce','被修改的问题',ValueError)]:
                 with self.assertRaises(error):self.service.submit(question,'retry',{'database_id':db,'retry_task_id':'old-report'},user)
             invoke.assert_not_called()
+
+    def test_provider_failure_preserves_automatic_sources_for_later_retry(self):
+        from app.errors import PipelineStageError
+        self.seed()
+        with patch.object(self.service.workflow,'invoke',side_effect=PipelineStageError('qa_answer','测试接口不可用')):
+            failed=self.service.submit('原报告问题','retry',{'database_id':'olist_ecommerce'},'demo_admin')
+        expected=[source['task_id'] for source in failed.analysis_sources]
+        self.assertEqual(len(expected),4)
+        extra=QueryResult(task_id='newer-result',status='completed',route='database_query',message='new',columns=['orders'],rows=[{'orders':999}])
+        self.service.context.remember('demo_admin:retry:olist_ecommerce',extra,'后来新增的查询',{'database_id':'olist_ecommerce'},'demo_admin')
+        result=QueryResult(task_id='network-retry',status='completed',route='data_qa',message='ok')
+        with patch.object(self.service.workflow,'invoke',return_value=result) as invoke:
+            self.service.submit('原报告问题','retry',{'database_id':'olist_ecommerce','retry_task_id':failed.task_id},'demo_admin')
+        self.assertEqual([source['task_id'] for source in invoke.call_args.args[0]['analysis_sources']],expected)
+
+    def test_running_job_does_not_reuse_a_different_original_report_retry(self):
+        from app.api import routes
+        ids=self.seed()
+        original=self.service.tasks['old-report']['result'].model_copy(deep=True)
+        original.task_id='other-report'
+        self.service.context.remember('demo_admin:retry:olist_ecommerce',original,'原报告问题',{'database_id':'olist_ecommerce','analysis_table_ids':ids[:4]},'demo_admin')
+        with patch.dict(routes.JOBS,{},clear=True),patch.object(routes,'EXECUTOR',Mock()) as executor:
+            body={'query':'原报告问题','session_id':'retry','workspace':{'database_id':'olist_ecommerce','retry_task_id':'old-report'}}
+            first=self.client.post('/api/jobs',headers=self.admin,json=body)
+            same=self.client.post('/api/jobs',headers=self.admin,json=body)
+            different=self.client.post('/api/jobs',headers=self.admin,json={**body,'workspace':{**body['workspace'],'retry_task_id':'other-report'}})
+            self.assertEqual(first.status_code,200)
+            self.assertEqual(same.json()['id'],first.json()['id'])
+            self.assertEqual(different.status_code,409)
+            self.assertEqual(executor.submit.call_count,1)
