@@ -1,0 +1,77 @@
+{
+  "recorded_at": "2026-10-28",
+  "scope": "Agent role simulation on public Olist historical data",
+  "source_revision": "9bac2e499bc317f73ea6a655894f4033a48cb519",
+  "online_report": {
+    "status": "passed",
+    "product": "http://47.76.25.13/shuce/",
+    "task_id": "2fa3807d5e58",
+    "sources": 6,
+    "model_mode": "model_with_facts",
+    "charts": 1,
+    "model_requests": 3,
+    "model_failures": 0,
+    "validation_codes": [
+      "uncited_business_value"
+    ],
+    "summary_export": true,
+    "full_export": true,
+    "summary_print_scope": true,
+    "archive_restored_after_new_login": true,
+    "mobile_overflow": false,
+    "appendix_contains_timeline": true,
+    "js_errors": []
+  },
+  "local_original_questions": [
+    {
+      "case": "price",
+      "task_id": "a924d04dc463",
+      "status": "completed",
+      "rows": 2,
+      "model_calls": 5,
+      "answer_checks": [
+        {
+          "question": "8月单均商品金额涨了这么多，是因为涨价了吗",
+          "status": "insufficient_evidence"
+        },
+        {
+          "question": "请保持刚才的范围，把7月和8月的单均商品金额拆成“每单健康美容商品件数”和“健康美容商品平均每件金额”，帮我判断先查价格还是购买结构",
+          "status": "answered"
+        }
+      ]
+    },
+    {
+      "case": "quality",
+      "task_id": "e9c125213662",
+      "status": "completed",
+      "rows": 4,
+      "model_calls": 5,
+      "answer_checks": [
+        {
+          "question": "样本足够支持“配送超时导致差评”吗",
+          "status": "insufficient_evidence"
+        }
+      ]
+    },
+    {
+      "case": "timeline",
+      "task_id": "1b90ea0ae99a",
+      "status": "completed",
+      "rows": 1,
+      "model_calls": 5,
+      "answer_checks": [
+        {
+          "question": "订单c5a2bd922645770b148755d89a577853现在是已送达，评价却说没收到，看上去矛盾",
+          "status": "insufficient_evidence"
+        },
+        {
+          "question": "请查这笔订单的下单时间、预计送达、实际送达、评价问卷创建时间和客户实际回复时间，按先后解释是不是评论写在收货之前",
+          "status": "answered"
+        }
+      ]
+    }
+  ],
+  "backend_tests": 203,
+  "frontend_tests": 19,
+  "no_external_user_research": true
+}

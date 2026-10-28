@@ -1,0 +1,505 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "数策 · 可追溯经营分析架构",
+    "locale": "zh-CN",
+    "output": "shuce-archify.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Andy021110/shuce-workbench.git",
+      "revision": "9bac2e499bc317f73ea6a655894f4033a48cb519"
+    },
+    "views": [
+      {
+        "id": "free-query",
+        "label": "自由问数",
+        "focus": [
+          "analysis-ui",
+          "auth-api",
+          "analysis-jobs",
+          "agent-retrieval",
+          "model-services",
+          "schema-cache",
+          "mcp-tools",
+          "duckdb-engine",
+          "csv-samples",
+          "result-snapshots"
+        ],
+        "note": "实际模型请求与数据库工具分别记录，SQL 执行成功不等于业务判断正确。"
+      },
+      {
+        "id": "standard-review",
+        "label": "标准复盘",
+        "focus": [
+          "analysis-ui",
+          "auth-api",
+          "analysis-jobs",
+          "standard-metrics",
+          "duckdb-engine",
+          "csv-samples",
+          "result-snapshots"
+        ],
+        "note": "固定口径由后端 SQL 计算；该路径可以没有模型请求。"
+      },
+      {
+        "id": "report-delivery",
+        "label": "报告与恢复",
+        "focus": [
+          "analysis-ui",
+          "analysis-jobs",
+          "session-archive",
+          "agent-retrieval",
+          "report-validation",
+          "model-services"
+        ],
+        "note": "原问题和已选快照绑定，数值校验失败时保留事实并明确未完成解读。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "analysis-ui",
+      "type": "frontend",
+      "label": "经营分析工作台",
+      "sublabel": "范围、结果、报告与恢复",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/api.ts",
+          "line": 11,
+          "end_line": 31
+        }
+      ]
+    },
+    {
+      "id": "auth-api",
+      "type": "security",
+      "label": "认证与权限接口",
+      "sublabel": "账号 / 数据源 / 表范围",
+      "pos": [
+        360,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/api/routes.py",
+          "line": 39,
+          "end_line": 53
+        },
+        {
+          "path": "backend/app/security/auth.py",
+          "line": 49,
+          "end_line": 76
+        }
+      ]
+    },
+    {
+      "id": "analysis-jobs",
+      "type": "backend",
+      "label": "异步业务任务",
+      "sublabel": "线程池、进度与调用记录",
+      "pos": [
+        680,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/api/routes.py",
+          "line": 409,
+          "end_line": 445
+        },
+        {
+          "path": "backend/app/services/askdata_service.py",
+          "line": 110,
+          "end_line": 121
+        },
+        {
+          "path": "backend/app/services/session_context.py",
+          "line": 40,
+          "end_line": 73
+        }
+      ]
+    },
+    {
+      "id": "session-archive",
+      "type": "database",
+      "label": "SQLite 会话归档",
+      "sublabel": "按用户与数据源隔离",
+      "pos": [
+        1000,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/services/session_archive.py",
+          "line": 22,
+          "end_line": 70
+        }
+      ]
+    },
+    {
+      "id": "model-services",
+      "type": "cloud",
+      "label": "外部模型服务",
+      "sublabel": "Chat / Embedding / Rerank",
+      "pos": [
+        40,
+        280
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/model_client.py",
+          "line": 35,
+          "end_line": 63
+        },
+        {
+          "path": "backend/app/model_client.py",
+          "line": 88,
+          "end_line": 121
+        }
+      ]
+    },
+    {
+      "id": "agent-retrieval",
+      "type": "backend",
+      "label": "AI 路由与模型编排",
+      "sublabel": "LangGraph / 问数与报告",
+      "pos": [
+        360,
+        280
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/workflows/query_graph.py",
+          "line": 36,
+          "end_line": 65
+        },
+        {
+          "path": "backend/app/retrieval/service.py",
+          "line": 55,
+          "end_line": 87
+        },
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 110,
+          "end_line": 128
+        }
+      ]
+    },
+    {
+      "id": "standard-metrics",
+      "type": "backend",
+      "label": "标准指标与月度复盘",
+      "sublabel": "后端固定 SQL；可不调模型",
+      "pos": [
+        1000,
+        280
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/services/askdata_service.py",
+          "line": 169,
+          "end_line": 216
+        }
+      ]
+    },
+    {
+      "id": "report-validation",
+      "type": "backend",
+      "label": "报告事实校验与交付",
+      "sublabel": "数值引用、范围与事实回退",
+      "pos": [
+        680,
+        280
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 129,
+          "end_line": 158
+        },
+        {
+          "path": "backend/app/report_facts.py",
+          "line": 203,
+          "end_line": 248
+        }
+      ]
+    },
+    {
+      "id": "schema-cache",
+      "type": "database",
+      "label": "本地 Schema 混合索引",
+      "sublabel": "JSON 缓存；不是 Milvus 服务",
+      "pos": [
+        40,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/retrieval/store.py",
+          "line": 47,
+          "end_line": 69
+        },
+        {
+          "path": "backend/app/retrieval/service.py",
+          "line": 55,
+          "end_line": 78
+        }
+      ]
+    },
+    {
+      "id": "mcp-tools",
+      "type": "backend",
+      "label": "进程内 MCP 工具",
+      "sublabel": "限定查询范围；只读 SQL",
+      "pos": [
+        360,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/workflows/query_graph.py",
+          "line": 63,
+          "end_line": 65
+        },
+        {
+          "path": "backend/app/mcp_runtime/tools/database_tools.py",
+          "line": 1,
+          "end_line": 49
+        }
+      ]
+    },
+    {
+      "id": "duckdb-engine",
+      "type": "backend",
+      "label": "DuckDB 执行与核对",
+      "sublabel": "只读校验与完整结果统计",
+      "pos": [
+        680,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/duckdb_engine.py",
+          "line": 39,
+          "end_line": 77
+        },
+        {
+          "path": "backend/app/querying/duckdb_engine.py",
+          "line": 86,
+          "end_line": 116
+        }
+      ]
+    },
+    {
+      "id": "result-snapshots",
+      "type": "database",
+      "label": "结果快照 JSON",
+      "sublabel": "分页、筛选与导出依据",
+      "pos": [
+        1000,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/duckdb_engine.py",
+          "line": 50,
+          "end_line": 67
+        }
+      ]
+    },
+    {
+      "id": "csv-samples",
+      "type": "database",
+      "label": "CSV 业务样本",
+      "sublabel": "Olist 历史 / 合成示例",
+      "pos": [
+        680,
+        760
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/duckdb_engine.py",
+          "line": 86,
+          "end_line": 114
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "submit-to-api",
+      "from": "analysis-ui",
+      "to": "auth-api",
+      "label": "提交问题",
+      "variant": "emphasis"
+    },
+    {
+      "id": "schedule-job",
+      "from": "auth-api",
+      "to": "analysis-jobs",
+      "label": "异步任务",
+      "variant": "dashed"
+    },
+    {
+      "id": "archive-turn",
+      "from": "analysis-jobs",
+      "to": "session-archive",
+      "label": "归档会话",
+      "variant": "default"
+    },
+    {
+      "id": "route-natural-language",
+      "from": "analysis-jobs",
+      "to": "agent-retrieval",
+      "label": "自由问数",
+      "variant": "default"
+    },
+    {
+      "id": "select-fixed-review",
+      "from": "analysis-jobs",
+      "to": "standard-metrics",
+      "label": "标准复盘",
+      "variant": "default"
+    },
+    {
+      "id": "invoke-models",
+      "from": "agent-retrieval",
+      "to": "model-services",
+      "label": "模型请求",
+      "variant": "emphasis"
+    },
+    {
+      "id": "read-index",
+      "from": "agent-retrieval",
+      "to": "schema-cache",
+      "label": "字段索引",
+      "variant": "default"
+    },
+    {
+      "id": "call-read-tool",
+      "from": "agent-retrieval",
+      "to": "mcp-tools",
+      "label": "许可工具",
+      "variant": "security"
+    },
+    {
+      "id": "execute-read-only",
+      "from": "mcp-tools",
+      "to": "duckdb-engine",
+      "label": "执行查询",
+      "variant": "emphasis"
+    },
+    {
+      "id": "execute-standard",
+      "from": "standard-metrics",
+      "to": "duckdb-engine",
+      "label": "固定 SQL",
+      "variant": "default"
+    },
+    {
+      "id": "read-csv",
+      "from": "duckdb-engine",
+      "to": "csv-samples",
+      "label": "读取数据",
+      "variant": "default"
+    },
+    {
+      "id": "write-snapshot",
+      "from": "duckdb-engine",
+      "to": "result-snapshots",
+      "label": "保存快照",
+      "variant": "default"
+    },
+    {
+      "id": "analyze-existing",
+      "from": "agent-retrieval",
+      "to": "report-validation",
+      "label": "已有结果解读",
+      "variant": "default"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "业务流程",
+      "items": [
+        "先确认月份、州、品类、状态与指标口径，再查询并核对。",
+        "标准 SQL 和模型 Agent 是两条实际存在的执行路径。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "交付与校验",
+      "items": [
+        "报告只引用已授权结果；无效数值或范围说明不作为模型解读交付。",
+        "摘要与事实附录分开，失败重试绑定原问题和当时来源。"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "读取边界",
+      "items": [
+        "这是单机实现概览，不是多租户生产架构或实时监控。",
+        "MCP 当前进程内运行；省略图表配置、浏览器草稿等次级往返路径。",
+        "模型编排层包含报告生成；报告节点表示输出校验与交付。"
+      ]
+    }
+  ]
+}
