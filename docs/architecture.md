@@ -1,6 +1,6 @@
 # 架构与实现
 
-[可交互架构图：切换场景、点选模块并查看对应实现](http://47.76.25.13/portfolio/shuce.html#interactive-architecture)
+[可交互架构图：完整总览、机制切换与固定源码](http://47.76.25.13/portfolio/shuce.html#interactive-architecture)
 
 ## 模块和数据流
 
@@ -53,3 +53,10 @@
 
 
 [Archify 完整交互架构](http://47.76.25.13/portfolio/architecture/shuce-archify.html)：节点来源固定到已检查 Git 提交，可追踪关系并下载离线 HTML；这是一张架构快照。
+
+
+## 完整交互架构与分层阅读
+
+[作品集内直接查看](http://47.76.25.13/portfolio/shuce.html#interactive-architecture)，无需展开。当前提供 系统总览、混合检索与执行、报告与恢复 三张图。它们依据固定提交里的真实调用、校验和持久化职责编制；一个逻辑组件不等于一个独立进程或微服务。旧版只展示答复或查询主路径，现已扩展为完整系统和关键机制图。
+
+Schema 索引当前为本地 JSON 缓存，MCP 为进程内工具。标准 SQL 可以不调用模型；自由问数、Embedding、Rerank、数据库工具和报告生成分别计量。报告路径展示事实引用、校验、有限重写、图表来源检查和事实回退。

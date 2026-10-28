@@ -1,0 +1,586 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "数策 · 混合检索、澄清与 SQL 执行",
+    "locale": "zh-CN",
+    "output": "shuce-retrieval.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Andy021110/shuce-workbench.git",
+      "revision": "9e2b762fa1c8d8ccbab2fc64aec4a7eb46c697d8"
+    },
+    "views": [
+      {
+        "id": "recall",
+        "label": "混合召回",
+        "focus": [
+          "request",
+          "route",
+          "scope",
+          "terms",
+          "bm25",
+          "dense",
+          "index",
+          "rrf",
+          "rerank",
+          "schema"
+        ],
+        "note": "不是一次向量检索：词法与向量并行召回，经 RRF、重排和阈值筛选。"
+      },
+      {
+        "id": "clarification",
+        "label": "澄清与继续",
+        "focus": [
+          "request",
+          "route",
+          "scope",
+          "terms",
+          "schema",
+          "clarify"
+        ],
+        "note": "工作流可暂停等待补充；澄清不是 SQL 已成功执行。"
+      },
+      {
+        "id": "execution",
+        "label": "工具与结果",
+        "focus": [
+          "schema",
+          "mcp",
+          "duckdb",
+          "csv",
+          "snapshot",
+          "telemetry"
+        ],
+        "note": "发现工具不等于调用工具；一次分析可以包含多个模型或工具请求。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "request",
+      "type": "external",
+      "label": "原问题与当前范围",
+      "sublabel": "保留时间、维度与指标",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/workflows/query_graph.py",
+          "line": 139,
+          "end_line": 160
+        }
+      ]
+    },
+    {
+      "id": "route",
+      "type": "backend",
+      "label": "意图与查询预处理",
+      "sublabel": "直接答复 / 数据问答 / 查库",
+      "pos": [
+        340,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/workflows/query_graph.py",
+          "line": 75,
+          "end_line": 98
+        }
+      ]
+    },
+    {
+      "id": "scope",
+      "type": "security",
+      "label": "允许的表与字段",
+      "sublabel": "访问范围裁剪候选",
+      "pos": [
+        640,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/retrieval/service.py",
+          "line": 111,
+          "end_line": 128
+        }
+      ]
+    },
+    {
+      "id": "terms",
+      "type": "backend",
+      "label": "Schema 检索词",
+      "sublabel": "字段文档与语义描述",
+      "pos": [
+        940,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/retrieval/service.py",
+          "line": 95,
+          "end_line": 109
+        }
+      ]
+    },
+    {
+      "id": "qa",
+      "type": "backend",
+      "label": "已有结果问答",
+      "sublabel": "不强制生成新 SQL",
+      "pos": [
+        40,
+        200
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/workflows/query_graph.py",
+          "line": 84,
+          "end_line": 98
+        }
+      ]
+    },
+    {
+      "id": "bm25",
+      "type": "backend",
+      "label": "BM25 词法召回",
+      "sublabel": "对允许字段进行词法匹配",
+      "pos": [
+        340,
+        200
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/retrieval/service.py",
+          "line": 130,
+          "end_line": 139
+        }
+      ]
+    },
+    {
+      "id": "dense",
+      "type": "backend",
+      "label": "向量召回",
+      "sublabel": "调用 Embedding 查询向量",
+      "pos": [
+        640,
+        200
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/retrieval/service.py",
+          "line": 140,
+          "end_line": 147
+        }
+      ]
+    },
+    {
+      "id": "index",
+      "type": "database",
+      "label": "字段 Schema 索引",
+      "sublabel": "JSON 索引 / 缓存签名",
+      "pos": [
+        940,
+        200
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/retrieval/service.py",
+          "line": 52,
+          "end_line": 93
+        }
+      ]
+    },
+    {
+      "id": "rrf",
+      "type": "backend",
+      "label": "RRF 排名融合",
+      "sublabel": "合并词法与向量排名",
+      "pos": [
+        340,
+        360
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/retrieval/service.py",
+          "line": 149,
+          "end_line": 159
+        }
+      ]
+    },
+    {
+      "id": "rerank",
+      "type": "cloud",
+      "label": "Rerank 与阈值筛选",
+      "sublabel": "低分字段不进入 Schema 图",
+      "pos": [
+        640,
+        360
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/retrieval/service.py",
+          "line": 164,
+          "end_line": 184
+        }
+      ]
+    },
+    {
+      "id": "clarify",
+      "type": "backend",
+      "label": "条件不足时澄清",
+      "sublabel": "等待用户补齐后再检索",
+      "pos": [
+        940,
+        360
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/workflows/query_graph.py",
+          "line": 99,
+          "end_line": 121
+        },
+        {
+          "path": "backend/app/workflows/query_graph.py",
+          "line": 244,
+          "end_line": 259
+        }
+      ]
+    },
+    {
+      "id": "snapshot",
+      "type": "database",
+      "label": "完整结果与统计快照",
+      "sublabel": "全量行 / profile / SQL",
+      "pos": [
+        40,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/duckdb_engine.py",
+          "line": 51,
+          "end_line": 75
+        }
+      ]
+    },
+    {
+      "id": "duckdb",
+      "type": "backend",
+      "label": "SQL 校验和 DuckDB",
+      "sublabel": "表权限 / 只读 / 资源上限",
+      "pos": [
+        340,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/duckdb_engine.py",
+          "line": 37,
+          "end_line": 75
+        },
+        {
+          "path": "backend/app/querying/duckdb_engine.py",
+          "line": 119,
+          "end_line": 160
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "单库 Agent 与 MCP",
+      "sublabel": "计划 / 工具发现 / 调用",
+      "pos": [
+        640,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/workflows/query_graph.py",
+          "line": 261,
+          "end_line": 285
+        },
+        {
+          "path": "backend/app/mcp_runtime/tools/database_tools.py",
+          "line": 1,
+          "end_line": 49
+        }
+      ]
+    },
+    {
+      "id": "schema",
+      "type": "backend",
+      "label": "字段图与关联上下文",
+      "sublabel": "足够依据才进入执行",
+      "pos": [
+        940,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/workflows/query_graph.py",
+          "line": 198,
+          "end_line": 242
+        }
+      ]
+    },
+    {
+      "id": "csv",
+      "type": "database",
+      "label": "受权 CSV 数据",
+      "sublabel": "内存 DuckDB 的只读视图",
+      "pos": [
+        340,
+        680
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/duckdb_engine.py",
+          "line": 86,
+          "end_line": 115
+        }
+      ]
+    },
+    {
+      "id": "telemetry",
+      "type": "backend",
+      "label": "模型与工具执行事件",
+      "sublabel": "成功、失败、重试分开",
+      "pos": [
+        640,
+        680
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/telemetry.py",
+          "line": 70,
+          "end_line": 86
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "request--route",
+      "from": "request",
+      "to": "route",
+      "label": "理解问题",
+      "variant": "emphasis"
+    },
+    {
+      "id": "route--scope",
+      "from": "route",
+      "to": "scope",
+      "label": "查询分支",
+      "variant": "default"
+    },
+    {
+      "id": "scope--terms",
+      "from": "scope",
+      "to": "terms",
+      "label": "限定字段",
+      "variant": "security"
+    },
+    {
+      "id": "route--qa",
+      "from": "route",
+      "to": "qa",
+      "label": "已有数据",
+      "variant": "default"
+    },
+    {
+      "id": "terms--bm25",
+      "from": "terms",
+      "to": "bm25",
+      "label": "相同检索词",
+      "variant": "default"
+    },
+    {
+      "id": "terms--dense",
+      "from": "terms",
+      "to": "dense",
+      "label": "相同检索词",
+      "variant": "default"
+    },
+    {
+      "id": "dense--index",
+      "from": "dense",
+      "to": "index",
+      "label": "向量查询",
+      "variant": "default"
+    },
+    {
+      "id": "bm25--index",
+      "from": "bm25",
+      "to": "index",
+      "label": "词法查询",
+      "variant": "default"
+    },
+    {
+      "id": "bm25--rrf",
+      "from": "bm25",
+      "to": "rrf",
+      "label": "排名",
+      "variant": "default"
+    },
+    {
+      "id": "dense--rrf",
+      "from": "dense",
+      "to": "rrf",
+      "label": "排名",
+      "variant": "default"
+    },
+    {
+      "id": "rrf--rerank",
+      "from": "rrf",
+      "to": "rerank",
+      "label": "候选字段",
+      "variant": "default"
+    },
+    {
+      "id": "rerank--schema",
+      "from": "rerank",
+      "to": "schema",
+      "label": "阈值筛选",
+      "variant": "default"
+    },
+    {
+      "id": "schema--clarify",
+      "from": "schema",
+      "to": "clarify",
+      "label": "条件不足",
+      "variant": "default"
+    },
+    {
+      "id": "clarify--terms",
+      "from": "clarify",
+      "to": "terms",
+      "label": "补充后重检索",
+      "variant": "default"
+    },
+    {
+      "id": "schema--mcp",
+      "from": "schema",
+      "to": "mcp",
+      "label": "依据足够",
+      "variant": "default"
+    },
+    {
+      "id": "mcp--duckdb",
+      "from": "mcp",
+      "to": "duckdb",
+      "label": "受限 SQL",
+      "variant": "default"
+    },
+    {
+      "id": "duckdb--csv",
+      "from": "duckdb",
+      "to": "csv",
+      "label": "只读查询",
+      "variant": "default"
+    },
+    {
+      "id": "duckdb--snapshot",
+      "from": "duckdb",
+      "to": "snapshot",
+      "label": "结果持久化",
+      "variant": "default"
+    },
+    {
+      "id": "mcp--telemetry",
+      "from": "mcp",
+      "to": "telemetry",
+      "label": "实际调用",
+      "variant": "default"
+    }
+  ],
+  "cards": [
+    {
+      "title": "失败边界",
+      "items": [
+        "Embedding 或 Rerank 失败会形成明确阶段错误，不伪造已完成检索。",
+        "SQL 不被允许、资源不足或结果过大时返回失败，不把空结果当成功。"
+      ],
+      "dot": "amber"
+    },
+    {
+      "title": "证据口径",
+      "items": [
+        "图里的顺序是机制说明，不是新增线上实跑。",
+        "真实任务的 Chat、Embedding、Rerank 和数据库工具次数以验收摘要为准。"
+      ],
+      "dot": "slate"
+    }
+  ]
+}

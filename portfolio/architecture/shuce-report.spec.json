@@ -1,0 +1,604 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "数策 · 报告事实、图表交付与恢复",
+    "locale": "zh-CN",
+    "output": "shuce-report.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Andy021110/shuce-workbench.git",
+      "revision": "9e2b762fa1c8d8ccbab2fc64aec4a7eb46c697d8"
+    },
+    "views": [
+      {
+        "id": "normal",
+        "label": "报告交付",
+        "focus": [
+          "question",
+          "selection",
+          "facts",
+          "catalog",
+          "brief",
+          "agent",
+          "model",
+          "validate",
+          "chart-contract",
+          "tools",
+          "charts",
+          "delivered",
+          "ui",
+          "archive"
+        ],
+        "note": "模型负责结构化解读；数字来自已执行事实，图表字段和来源再次校验。"
+      },
+      {
+        "id": "failure",
+        "label": "失败与重写",
+        "focus": [
+          "agent",
+          "model",
+          "validate",
+          "retry",
+          "fallback",
+          "brief",
+          "ui",
+          "archive"
+        ],
+        "note": "预算耗尽保留事实并说明解读未完成；不把事实回退伪装成完成报告。"
+      },
+      {
+        "id": "restore",
+        "label": "来源与恢复",
+        "focus": [
+          "question",
+          "selection",
+          "facts",
+          "catalog",
+          "archive",
+          "ui"
+        ],
+        "note": "原问题和实际来源一起保留，恢复与重试不会偷偷改成另一批分析依据。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "question",
+      "type": "external",
+      "label": "原问题与报告要求",
+      "sublabel": "一页摘要 / 图表 / 结论数",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/report_delivery.py",
+          "line": 6,
+          "end_line": 17
+        }
+      ]
+    },
+    {
+      "id": "selection",
+      "type": "security",
+      "label": "当前用户的已选快照",
+      "sublabel": "按用户与来源检查归属",
+      "pos": [
+        340,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/services/session_context.py",
+          "line": 249,
+          "end_line": 295
+        }
+      ]
+    },
+    {
+      "id": "facts",
+      "type": "backend",
+      "label": "数值事实目录",
+      "sublabel": "真实 ID / 来源 / 口径",
+      "pos": [
+        640,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/report_facts.py",
+          "line": 99,
+          "end_line": 148
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "type": "backend",
+      "label": "可用数据与事实别名",
+      "sublabel": "绑定原始 fact 和 task",
+      "pos": [
+        940,
+        40
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 52,
+          "end_line": 69
+        },
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 98,
+          "end_line": 110
+        }
+      ]
+    },
+    {
+      "id": "archive",
+      "type": "database",
+      "label": "SQLite 分析与报告归档",
+      "sublabel": "命名、历史与重新登录恢复",
+      "pos": [
+        40,
+        200
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/services/session_archive.py",
+          "line": 22,
+          "end_line": 70
+        }
+      ]
+    },
+    {
+      "id": "brief",
+      "type": "backend",
+      "label": "事实附录与可核对摘要",
+      "sublabel": "后端计算，不让模型心算",
+      "pos": [
+        340,
+        200
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/report_facts.py",
+          "line": 40,
+          "end_line": 98
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "报告 Agent 与 Skill",
+      "sublabel": "生成结构化解读和建议",
+      "pos": [
+        640,
+        200
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 71,
+          "end_line": 114
+        }
+      ]
+    },
+    {
+      "id": "model",
+      "type": "cloud",
+      "label": "Chat 模型请求",
+      "sublabel": "按报告契约组织文字",
+      "pos": [
+        940,
+        200
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 111,
+          "end_line": 129
+        }
+      ]
+    },
+    {
+      "id": "fallback",
+      "type": "backend",
+      "label": "校验失败的事实回退",
+      "sublabel": "事实可看 / 解读未完成",
+      "pos": [
+        40,
+        360
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 150,
+          "end_line": 159
+        }
+      ]
+    },
+    {
+      "id": "retry",
+      "type": "backend",
+      "label": "有上限的重写",
+      "sublabel": "紧凑报告 3 次 / 其他 2 次",
+      "pos": [
+        340,
+        360
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 111,
+          "end_line": 115
+        },
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 150,
+          "end_line": 158
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "type": "security",
+      "label": "事实与因果边界校验",
+      "sublabel": "数字引用 / 范围 / 非因果",
+      "pos": [
+        640,
+        360
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 117,
+          "end_line": 136
+        },
+        {
+          "path": "backend/app/report_facts.py",
+          "line": 204,
+          "end_line": 248
+        }
+      ]
+    },
+    {
+      "id": "chart-contract",
+      "type": "backend",
+      "label": "图表数量和偏好合并",
+      "sublabel": "按原始快照选择来源",
+      "pos": [
+        940,
+        360
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/report_delivery.py",
+          "line": 26,
+          "end_line": 63
+        }
+      ]
+    },
+    {
+      "id": "persist",
+      "type": "backend",
+      "label": "业务服务与会话保存",
+      "sublabel": "经服务写入报告状态",
+      "pos": [
+        40,
+        680
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/services/session_context.py",
+          "line": 45,
+          "end_line": 73
+        }
+      ]
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "报告、附录与恢复入口",
+      "sublabel": "重试 / 人工补充 / 导出",
+      "pos": [
+        40,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/components/ReportCard.vue",
+          "line": 1,
+          "end_line": 45
+        }
+      ]
+    },
+    {
+      "id": "delivered",
+      "type": "backend",
+      "label": "已校验的解读与材料",
+      "sublabel": "保留来源、图表和反馈",
+      "pos": [
+        340,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 137,
+          "end_line": 149
+        },
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 287,
+          "end_line": 298
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "type": "backend",
+      "label": "受限展示工具",
+      "sublabel": "图表参数与字段检查",
+      "pos": [
+        640,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 266,
+          "end_line": 285
+        }
+      ]
+    },
+    {
+      "id": "charts",
+      "type": "backend",
+      "label": "基于结果生成图表",
+      "sublabel": "不接受任意客户端数字",
+      "pos": [
+        940,
+        520
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/querying/data_qa_agent.py",
+          "line": 274,
+          "end_line": 285
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "question--selection",
+      "from": "question",
+      "to": "selection",
+      "label": "选定依据",
+      "variant": "emphasis"
+    },
+    {
+      "id": "selection--facts",
+      "from": "selection",
+      "to": "facts",
+      "label": "授权结果",
+      "variant": "security"
+    },
+    {
+      "id": "facts--catalog",
+      "from": "facts",
+      "to": "catalog",
+      "label": "组织事实",
+      "variant": "default"
+    },
+    {
+      "id": "facts--brief",
+      "from": "facts",
+      "to": "brief",
+      "label": "可核对附录",
+      "variant": "default"
+    },
+    {
+      "id": "catalog--agent",
+      "from": "catalog",
+      "to": "agent",
+      "label": "事实与范围",
+      "variant": "default"
+    },
+    {
+      "id": "agent--model",
+      "from": "agent",
+      "to": "model",
+      "label": "结构化生成",
+      "variant": "default"
+    },
+    {
+      "id": "model--validate",
+      "from": "model",
+      "to": "validate",
+      "label": "检查内容",
+      "variant": "security"
+    },
+    {
+      "id": "validate--retry",
+      "from": "validate",
+      "to": "retry",
+      "label": "不通过",
+      "variant": "default"
+    },
+    {
+      "id": "retry--agent",
+      "from": "retry",
+      "to": "agent",
+      "label": "预算内重写",
+      "variant": "default"
+    },
+    {
+      "id": "retry--fallback",
+      "from": "retry",
+      "to": "fallback",
+      "label": "预算耗尽",
+      "variant": "default"
+    },
+    {
+      "id": "validate--chart-contract",
+      "from": "validate",
+      "to": "chart-contract",
+      "label": "内容通过",
+      "variant": "security"
+    },
+    {
+      "id": "chart-contract--tools",
+      "from": "chart-contract",
+      "to": "tools",
+      "label": "数量与偏好",
+      "variant": "default"
+    },
+    {
+      "id": "tools--charts",
+      "from": "tools",
+      "to": "charts",
+      "label": "来源合法",
+      "variant": "security"
+    },
+    {
+      "id": "charts--delivered",
+      "from": "charts",
+      "to": "delivered",
+      "label": "图表材料",
+      "variant": "default"
+    },
+    {
+      "id": "validate--delivered",
+      "from": "validate",
+      "to": "delivered",
+      "label": "正文通过",
+      "variant": "security"
+    },
+    {
+      "id": "delivered--ui",
+      "from": "delivered",
+      "to": "ui",
+      "label": "展示与导出",
+      "variant": "default"
+    },
+    {
+      "id": "fallback--ui",
+      "from": "fallback",
+      "to": "ui",
+      "label": "明确未完成",
+      "variant": "default"
+    },
+    {
+      "id": "ui--persist",
+      "from": "ui",
+      "to": "persist",
+      "label": "提交保存",
+      "variant": "default"
+    },
+    {
+      "id": "persist--archive",
+      "from": "persist",
+      "to": "archive",
+      "label": "写入归档",
+      "variant": "default"
+    },
+    {
+      "id": "archive--selection",
+      "from": "archive",
+      "to": "selection",
+      "label": "读取历史",
+      "variant": "default"
+    }
+  ],
+  "cards": [
+    {
+      "title": "事实与解释分开",
+      "items": [
+        "事实附录来自后端计算；模型解释不能自动升格为已证实原因。",
+        "图表和报告引用当前用户、当前数据源允许的已完成分析。"
+      ],
+      "dot": "slate"
+    },
+    {
+      "title": "执行与交付分开",
+      "items": [
+        "HTTP 返回、模型调用、图表生成、报告校验各有状态。",
+        "有有效事实时保留事实；没有有效解读时明确未完成。"
+      ],
+      "dot": "amber"
+    }
+  ]
+}

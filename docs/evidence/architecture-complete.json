@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-28",
+  "renderer": "tt-a1i/archify 3.2",
+  "directly_visible": true,
+  "section_url": "http://47.76.25.13/portfolio/shuce.html#interactive-architecture",
+  "diagrams": [
+    {
+      "name": "shuce-system",
+      "nodes": 21,
+      "connections": 23,
+      "source_revision": "9e2b762fa1c8d8ccbab2fc64aec4a7eb46c697d8",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "html_sha256": "ace8ebb14350bf46ee36c6b5e46917f2444d2cd801f11f0d7319ea308356625f",
+      "url": "http://47.76.25.13/portfolio/architecture/shuce-system.html"
+    },
+    {
+      "name": "shuce-retrieval",
+      "nodes": 17,
+      "connections": 19,
+      "source_revision": "9e2b762fa1c8d8ccbab2fc64aec4a7eb46c697d8",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "html_sha256": "a4916d4d670fa6802042fa5ff5463d28e1bd353d5a06a6887af476c307bb2829",
+      "url": "http://47.76.25.13/portfolio/architecture/shuce-retrieval.html"
+    },
+    {
+      "name": "shuce-report",
+      "nodes": 17,
+      "connections": 20,
+      "source_revision": "9e2b762fa1c8d8ccbab2fc64aec4a7eb46c697d8",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "html_sha256": "ef4466953419a8a09a1a0a3ba2419b3c2c448eca94bc12765251f7f6354eb5de",
+      "url": "http://47.76.25.13/portfolio/architecture/shuce-report.html"
+    }
+  ],
+  "scope": "架构讲解；未修改产品执行逻辑；未新增模型调用",
+  "browser_review": "实际浏览器已检查机制切换、默认可读性、节点查找与固定源码；线上页面另行复验"
+}
